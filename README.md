@@ -20,7 +20,7 @@ existentes topan en 4.
 | 0    | Andamiaje del monorepo        | ✅     |
 | 1    | Engine puro testeado, sin UI  | ✅     |
 | 2    | Server + protocolo, sin UI    | ✅     |
-| 3    | Cliente: esqueleto y conexión | ⬜     |
+| 3    | Cliente: esqueleto y conexión | ✅     |
 | 4    | Componentes en Storybook      | ⬜     |
 | 5    | Mesa de juego conectada       | ⬜     |
 | 6    | Animaciones y pulido          | ⬜     |
@@ -33,7 +33,7 @@ packages/
 ├── engine/     @uno/engine    reglas puras, cero deps de red
 ├── protocol/   @uno/protocol  eventos socket + schemas zod
 ├── server/     @uno/server    Socket.IO, salas, timers
-└── client/     @uno/client    React + Vite + Storybook        (fase 3)
+└── client/     @uno/client    React + Vite + Zustand
 ```
 
 Grafo estrictamente acíclico: `engine ← protocol ← server`, y `client → engine, protocol`.
@@ -53,8 +53,9 @@ pnpm sim -- 200 4 # 200 partidas de 4 jugadores
 pnpm lint
 pnpm typecheck
 
-# servidor
-pnpm --filter @uno/server dev            # arranca en :3000
+# servidor y cliente (uno en cada terminal)
+pnpm --filter @uno/server dev            # :3000
+pnpm --filter @uno/client dev            # :5173
 
 # cliente de terminal, para jugar sin UI.
 # OJO: el servidor tiene que estar corriendo en OTRA terminal.
@@ -120,6 +121,22 @@ Los que rompen implementaciones de UNO, cada uno con test dedicado:
 - **Desconexión ≠ abandono**: el timer no se pausa, porque pausarlo deja que una
   conexión mala congele a los otros 9.
 
+## Sesion e identidad
+
+El `playerToken` es la credencial del asiento: no hay login. Se guarda en
+**`sessionStorage`, que es por pestaña**, no en `localStorage`.
+
+La diferencia importa y ya causo un bug: con `localStorage`, dos pestañas del
+mismo navegador comparten la entrada y la segunda pisa el token de la primera.
+Al recargar, la primera reclamaba el asiento de la segunda **y veia su mano**.
+El servidor respondia correctamente — le mandaban el token de otro asiento —,
+el error era del cliente. Es raro entre personas distintas, pero es exactamente
+como se prueba una mesa de 10 en una sola computadora.
+
+El costo asumido: cerrar la pestaña pierde la sesion. Es el trade-off correcto,
+porque perder el asiento al cerrar es recuperable y robarle el asiento a otro
+no lo es. El nickname si va a `localStorage`: es una preferencia de persona.
+
 ## La frontera de seguridad
 
 `redact(state, viewerId)` es la única función autorizada a producir lo que sale
@@ -134,7 +151,7 @@ jugadores y falla si un `CardId` ajeno aparece en cualquier payload.
 ## Verificación
 
 ```
-138 tests (110 del engine + 28 de integracion) · 96% de cobertura del engine
+144 tests (110 engine + 28 integracion + 6 cliente) · 96% de cobertura del engine
 1000 partidas de 10 jugadores simuladas, 0 violaciones de invariantes
 partida completa de 10 jugadores por sockets reales, 0 filtraciones
 ```

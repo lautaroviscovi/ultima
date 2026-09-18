@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -21,6 +22,18 @@ export default tseslint.config(
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
+    },
+  },
+
+  // El plugin de hooks es el que realmente atrapa bugs: dependencias faltantes
+  // en useMemo/useEffect que producen estado viejo renderizado como si fuera
+  // actual.
+  {
+    files: ['packages/client/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
     },
   },
 

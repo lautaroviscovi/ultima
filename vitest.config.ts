@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['packages/*/src/**/*.test.ts'],
+    // El cliente necesita DOM (sessionStorage/localStorage); el resto no.
+    environmentMatchGlobs: [['packages/client/**', 'jsdom']],
     testTimeout: 20_000,
     hookTimeout: 20_000,
     coverage: {
