@@ -25,7 +25,7 @@ export function Room(): JSX.Element {
 
   /**
    * Reclamo del asiento al montar. Cubre el refresh (la pestaña vuelve con el
-   * token en localStorage) y la vuelta tras una caida de red.
+   * token en sessionStorage) y la vuelta tras una caida de red.
    */
   useEffect(() => {
     if (!session) {
