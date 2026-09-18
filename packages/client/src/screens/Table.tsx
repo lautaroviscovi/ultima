@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MotionConfig } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import { isWild, type Card, type Color } from '@uno/engine';
 import {
@@ -25,6 +26,9 @@ import {
 } from '../hooks/useGame.js';
 import { useTurnTimer } from '../hooks/useTurnTimer.js';
 import { useEventLog } from '../hooks/useEventLog.js';
+import { useGameSounds } from '../hooks/useGameSounds.js';
+import { useReducedMotion } from '../hooks/useReducedMotion.js';
+import { unlockAudio } from '../net/sound.js';
 import { ColorPicker } from '../components/ColorPicker.js';
 import { ConnectionBadge } from '../components/ConnectionBadge.js';
 import { ErrorToast } from '../components/ErrorToast.js';
@@ -50,7 +54,11 @@ export function Table(): JSX.Element {
   const connection = useConnection();
   const timer = useTurnTimer();
   const log = useEventLog();
+  const reducedMotion = useReducedMotion();
+  const soundEnabled = useUIStore((s) => s.soundEnabled);
+  const toggleSound = useUIStore((s) => s.toggleSound);
   const [sortMode, setSortMode] = useSortMode();
+  useGameSounds();
 
   const colorPickerOpen = useUIStore((s) => s.colorPickerOpen);
   const pendingWildCardId = useUIStore((s) => s.pendingWildCardId);
@@ -77,6 +85,14 @@ export function Table(): JSX.Element {
   useEffect(() => {
     if (state?.phase === 'lobby') navigate(`/room/${roomId}`, { replace: true });
   }, [state?.phase, roomId, navigate]);
+
+  // Los navegadores bloquean el audio hasta que hay un gesto del usuario: lo
+  // desbloqueamos en el primer click para que el tick de turno ya suene.
+  useEffect(() => {
+    const unlock = (): void => unlockAudio();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    return () => window.removeEventListener('pointerdown', unlock);
+  }, []);
 
   useEffect(() => {
     const onResize = (): void => setTooNarrow(window.innerWidth < MIN_WIDTH);
@@ -193,83 +209,94 @@ export function Table(): JSX.Element {
     state.unoWindow && state.unoWindow.playerId !== state.you.id ? state.unoWindow.playerId : null;
 
   return (
-    <main className="relative min-h-screen bg-felt-dark">
-      <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
-        <ConnectionBadge status={connection} />
-        <span className="rounded-full bg-black/30 px-3 py-1 font-mono text-xs text-white/60">
-          {roomId}
-        </span>
-        {isMyTurn && timer.secondsLeft <= 15 && (
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-bold ${
-              timer.secondsLeft <= 5 ? 'bg-uno-red text-white' : 'bg-uno-yellow text-black'
-            }`}
-          >
-            {timer.secondsLeft}s
+    <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'}>
+      <main className="relative min-h-screen bg-felt-dark">
+        <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
+          <ConnectionBadge status={connection} />
+          <span className="rounded-full bg-black/30 px-3 py-1 font-mono text-xs text-white/60">
+            {roomId}
           </span>
-        )}
-      </div>
+          {isMyTurn && timer.secondsLeft <= 15 && (
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-bold ${
+                timer.secondsLeft <= 5 ? 'bg-uno-red text-white' : 'bg-uno-yellow text-black'
+              }`}
+            >
+              {timer.secondsLeft}s
+            </span>
+          )}
+        </div>
 
-      <div className="absolute right-3 top-3 z-20 flex items-center gap-2">
-        <button
-          onClick={() =>
-            setSortMode(sortMode === 'draw' ? 'color' : sortMode === 'color' ? 'value' : 'draw')
-          }
-          className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
-        >
-          orden: {sortMode === 'draw' ? 'robo' : sortMode === 'color' ? 'color' : 'valor'}
-        </button>
-        <button
-          onClick={handleLeave}
-          className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
-        >
-          salir
-        </button>
-      </div>
+        <div className="absolute right-3 top-3 z-20 flex items-center gap-2">
+          <button
+            onClick={() =>
+              setSortMode(sortMode === 'draw' ? 'color' : sortMode === 'color' ? 'value' : 'draw')
+            }
+            className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
+          >
+            orden: {sortMode === 'draw' ? 'robo' : sortMode === 'color' ? 'color' : 'valor'}
+          </button>
+          <button
+            onClick={toggleSound}
+            aria-pressed={soundEnabled}
+            title={soundEnabled ? 'Silenciar' : 'Activar sonido'}
+            className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
+          >
+            {soundEnabled ? 'sonido' : 'silencio'}
+          </button>
+          <button
+            onClick={handleLeave}
+            className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
+          >
+            salir
+          </button>
+        </div>
 
-      <TableLayout
-        opponents={opponents}
-        hand={hand}
-        playable={playable}
-        inFlight={cardsInFlight}
-        currentPlayerId={state.currentPlayerId}
-        myId={state.you.id}
-        discardTop={state.discardTop}
-        activeColor={state.activeColor}
-        drawPileCount={state.drawPileCount}
-        direction={state.direction}
-        turnProgress={timer.progress}
-        isMyTurn={isMyTurn}
-        unoWindowFor={unoWindowFor}
-        reverseFlash={reverseFlash}
-        onPlay={handlePlay}
-        onDraw={handleDraw}
-        onCallOut={handleCallOut}
-        onDeclareUno={handleDeclareUno}
-      />
+        <TableLayout
+          opponents={opponents}
+          hand={hand}
+          playable={playable}
+          inFlight={cardsInFlight}
+          currentPlayerId={state.currentPlayerId}
+          myId={state.you.id}
+          discardTop={state.discardTop}
+          activeColor={state.activeColor}
+          drawPileCount={state.drawPileCount}
+          direction={state.direction}
+          turnProgress={timer.progress}
+          isMyTurn={isMyTurn}
+          unoWindowFor={unoWindowFor}
+          reverseFlash={reverseFlash}
+          reducedMotion={reducedMotion}
+          onPlay={handlePlay}
+          onDraw={handleDraw}
+          onCallOut={handleCallOut}
+          onDeclareUno={handleDeclareUno}
+        />
 
-      <EventLog entries={log} />
+        <EventLog entries={log} />
 
-      {/*
-        Se abre por dos caminos: clickeaste un wild (pendingWildCardId), o el
-        servidor esta en choosing_color y te toca a vos — que pasa cuando la
-        carta inicial volteada es un wild. Sin el segundo, la partida quedaria
-        colgada esperando un color que nadie puede mandar.
-      */}
-      <ColorPicker
-        open={colorPickerOpen || (state.phase === 'choosing_color' && isMyTurn)}
-        onPick={handleColorPick}
-        {...(colorPickerOpen ? { onCancel: closeColorPicker } : {})}
-      />
+        {/*
+          Se abre por dos caminos: clickeaste un wild (pendingWildCardId), o el
+          servidor esta en choosing_color y te toca a vos — que pasa cuando la
+          carta inicial volteada es un wild. Sin el segundo, la partida quedaria
+          colgada esperando un color que nadie puede mandar.
+        */}
+        <ColorPicker
+          open={colorPickerOpen || (state.phase === 'choosing_color' && isMyTurn)}
+          onPick={handleColorPick}
+          {...(colorPickerOpen ? { onCancel: closeColorPicker } : {})}
+        />
 
-      <RoundOverlay
-        state={state}
-        isHost={Boolean(isHost)}
-        onNextRound={() => void nextRound()}
-        onLeave={handleLeave}
-      />
+        <RoundOverlay
+          state={state}
+          isHost={Boolean(isHost)}
+          onNextRound={() => void nextRound()}
+          onLeave={handleLeave}
+        />
 
-      <ErrorToast error={lastError} onDismiss={() => setError(null)} />
-    </main>
+        <ErrorToast error={lastError} onDismiss={() => setError(null)} />
+      </main>
+    </MotionConfig>
   );
 }

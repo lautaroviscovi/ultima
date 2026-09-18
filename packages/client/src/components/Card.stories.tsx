@@ -5,7 +5,7 @@ import { Card } from './Card.js';
 const meta = {
   title: 'Cartas/Card',
   component: Card,
-  args: { size: 'md', playable: true },
+  args: { size: 'md', playable: true, animateLayout: false },
 } satisfies Meta<typeof Card>;
 
 export default meta;

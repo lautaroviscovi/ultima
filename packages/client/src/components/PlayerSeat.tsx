@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import type { RedactedPlayer } from '@uno/engine';
 
 export interface PlayerSeatProps {
@@ -41,12 +42,17 @@ export function PlayerSeat({
         : null;
 
   return (
-    <div
+    <motion.div
+      // El movimiento del indicador de un asiento a otro ES en si mismo la
+      // señal de que cambio el turno: mas efectivo que cualquier estado
+      // estatico con 10 asientos en pantalla.
+      animate={{
+        scale: isCurrent ? 1.1 : 1,
+        opacity: player.abandoned ? 0.3 : isCurrent ? 1 : 0.8,
+      }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
       className={`relative flex w-[7.5rem] flex-col items-center rounded-xl px-2 py-1.5
-                  transition-all duration-300
-                  ${isCurrent ? 'bg-white/15 scale-110 shadow-lg shadow-black/40' : 'bg-black/25'}
-                  ${!isCurrent ? 'opacity-80' : ''}
-                  ${player.abandoned ? 'opacity-30' : ''}`}
+                  ${isCurrent ? 'bg-white/15 shadow-lg shadow-black/40' : 'bg-black/25'}`}
     >
       {/* Anillo de progreso: turno y urgencia en un solo elemento. */}
       {isCurrent && (
@@ -83,13 +89,20 @@ export function PlayerSeat({
 
       {/* Abanico de dorsos: se lee preatentivamente, sin leer el numero. */}
       <div className="flex h-5 items-center" aria-hidden>
-        {Array.from({ length: fan }, (_, i) => (
-          <i
-            key={i}
-            className="block h-5 w-2.5 shrink-0 rounded-[2px] border border-white/70 bg-neutral-900"
-            style={{ marginLeft: i === 0 ? 0 : '-3px' }}
-          />
-        ))}
+        <AnimatePresence mode="popLayout" initial={false}>
+          {Array.from({ length: fan }, (_, i) => (
+            <motion.i
+              key={i}
+              layout
+              initial={{ scaleY: 0.4, opacity: 0 }}
+              animate={{ scaleY: 1, opacity: 1 }}
+              exit={{ scaleY: 0.4, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              className="block h-5 w-2.5 shrink-0 rounded-[2px] border border-white/70 bg-neutral-900"
+              style={{ marginLeft: i === 0 ? 0 : '-3px' }}
+            />
+          ))}
+        </AnimatePresence>
         {player.cardCount === 0 && <span className="text-[0.65rem] text-white/50">sin cartas</span>}
       </div>
 
@@ -127,6 +140,6 @@ export function PlayerSeat({
           <span>¡No dijo UNO!</span>
         </button>
       )}
-    </div>
+    </motion.div>
   );
 }

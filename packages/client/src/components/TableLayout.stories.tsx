@@ -121,3 +121,11 @@ export const EstadosDeJugador: Story = {
 export const SentidoInvertido: Story = {
   args: { ...propsFor(10, { direction: -1 }), reverseFlash: true },
 };
+
+/**
+ * Movimiento reducido: las transiciones pasan a duracion 0 pero el estado
+ * final es el mismo. Nada queda a medio camino.
+ */
+export const MovimientoReducido: Story = {
+  args: { ...propsFor(10), reducedMotion: true, reverseFlash: true },
+};

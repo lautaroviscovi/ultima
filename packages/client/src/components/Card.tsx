@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import type { Card as CardModel, Color } from '@uno/engine';
 
 export type CardSize = 'sm' | 'md' | 'lg';
@@ -12,6 +13,18 @@ export interface CardProps {
   inFlight?: boolean;
   size?: CardSize;
   onClick?: (card: CardModel) => void;
+  /**
+   * Habilita la transicion compartida mano <-> descarte.
+   *
+   * ESTA es la razon por la que las cartas tienen id unico por INSTANCIA: con
+   * `layoutId`, Framer Motion reconoce que la carta que salio de tu mano es la
+   * misma que aparecio en el descarte y la anima volando. Sin id por
+   * instancia, al jugar una de tus dos `red-7` React no sabria cual
+   * desaparecio y la animacion saltaria.
+   *
+   * Se desactiva en grillas (Storybook) donde la misma carta aparece repetida.
+   */
+  animateLayout?: boolean;
 }
 
 const SIZE: Record<CardSize, string> = {
@@ -109,6 +122,7 @@ export function Card({
   inFlight = false,
   size = 'md',
   onClick,
+  animateLayout = true,
 }: CardProps): JSX.Element {
   if (faceDown) {
     return (
@@ -127,19 +141,24 @@ export function Card({
   const interactive = Boolean(onClick);
 
   return (
-    <button
+    <motion.button
+      {...(animateLayout ? { layoutId: card.id } : {})}
+      layout={animateLayout}
       type="button"
       disabled={!interactive || !playable}
       onClick={() => onClick?.(card)}
       aria-label={cardAria(card)}
       aria-pressed={selected}
+      // La carta jugable se eleva al pasar el mouse; la elevacion del
+      // seleccionado va por `animate` para que no pelee con el layout.
+      {...(playable ? { whileHover: { y: -10 }, whileTap: { scale: 0.96 } } : {})}
+      animate={{ y: selected ? -12 : 0, opacity: inFlight ? 0 : 1 }}
+      transition={{ type: 'spring', stiffness: 520, damping: 34 }}
       className={`${SIZE[size]} ${base} shrink-0 rounded-lg border-2 border-white
                   shadow-md relative flex items-center justify-center
-                  transition-transform duration-150
-                  ${playable ? 'hover:-translate-y-2 cursor-pointer' : ''}
+                  ${playable ? 'cursor-pointer' : ''}
                   ${!playable && interactive ? 'opacity-45 saturate-50 cursor-not-allowed' : ''}
-                  ${selected ? '-translate-y-3 ring-4 ring-white' : ''}
-                  ${inFlight ? 'opacity-0' : ''}`}
+                  ${selected ? 'ring-4 ring-white' : ''}`}
     >
       {/* Elipse blanca de fondo, el rasgo visual que define a la carta de UNO. */}
       {colored && (
@@ -164,6 +183,6 @@ export function Card({
           </span>
         </>
       )}
-    </button>
+    </motion.button>
   );
 }

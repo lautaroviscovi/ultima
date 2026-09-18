@@ -23,7 +23,7 @@ existentes topan en 4.
 | 3    | Cliente: esqueleto y conexión | ✅     |
 | 4    | Componentes en Storybook      | ✅     |
 | 5    | Mesa de juego conectada       | ✅     |
-| 6    | Animaciones y pulido          | ⬜     |
+| 6    | Animaciones y pulido          | ✅     |
 | 7    | Deploy y endurecimiento       | ⬜     |
 
 ## Paquetes
@@ -157,6 +157,28 @@ el codigo:
 - **El countdown se deriva de `turnDeadline`**, un timestamp absoluto del
   servidor. El timer autoritativo vive alla; el cliente solo pinta pixeles.
 
+## Animaciones y sonido
+
+La carta que sale de tu mano y aparece en el descarte es **la misma** para
+Framer Motion: `layoutId={card.id}` hace la transicion compartida y la carta
+vuela. Esa es la razon concreta por la que las cartas tienen id unico por
+INSTANCIA y no por cara — sin eso, al jugar una de tus dos `red-7` React no
+sabria cual desaparecio y la animacion saltaria.
+
+El reverse tiene la animacion mas grande del juego a proposito: es la jugada
+que mas confunde en UNO online, y con 10 jugadores un cambio de sentido que
+pasa desapercibido hace que la gente juegue fuera de turno.
+
+Los sonidos se sintetizan con WebAudio, sin archivos. El tick de turno es lo
+mas efectivo del set para atencion partida: con gente en videollamada nadie
+mira la mesa todo el tiempo. Se puede silenciar desde la mesa.
+
+**`prefers-reduced-motion` se respeta** via `MotionConfig`, que lo aplica a
+todo el arbol de una. No es decorativo: para alguien con sensibilidad
+vestibular las cartas volando pueden marear. Las transiciones pasan a duracion
+0 en vez de desaparecer, asi el estado final es el mismo y nada queda a medio
+camino. Storybook tiene un toggle en la toolbar para verlo.
+
 ## Sesion e identidad
 
 El `playerToken` es la credencial del asiento: no hay login. Se guarda en
@@ -187,7 +209,7 @@ jugadores y falla si un `CardId` ajeno aparece en cualquier payload.
 ## Verificación
 
 ```
-160 tests (110 engine + 28 integracion + 22 cliente) · 96% de cobertura del engine
+165 tests (110 engine + 28 integracion + 27 cliente) · 96% de cobertura del engine
 1000 partidas de 10 jugadores simuladas, 0 violaciones de invariantes
 partida completa de 10 jugadores por sockets reales, 0 filtraciones
 ```
