@@ -15,16 +15,16 @@ existentes topan en 4.
 
 ## Estado
 
-| Fase | Qué                           | Estado |
-| ---- | ----------------------------- | ------ |
-| 0    | Andamiaje del monorepo        | ✅     |
-| 1    | Engine puro testeado, sin UI  | ✅     |
-| 2    | Server + protocolo, sin UI    | ✅     |
-| 3    | Cliente: esqueleto y conexión | ✅     |
-| 4    | Componentes en Storybook      | ✅     |
-| 5    | Mesa de juego conectada       | ✅     |
-| 6    | Animaciones y pulido          | ✅     |
-| 7    | Deploy y endurecimiento       | ⬜     |
+| Fase | Qué                           | Estado                          |
+| ---- | ----------------------------- | ------------------------------- |
+| 0    | Andamiaje del monorepo        | ✅                              |
+| 1    | Engine puro testeado, sin UI  | ✅                              |
+| 2    | Server + protocolo, sin UI    | ✅                              |
+| 3    | Cliente: esqueleto y conexión | ✅                              |
+| 4    | Componentes en Storybook      | ✅                              |
+| 5    | Mesa de juego conectada       | ✅                              |
+| 6    | Animaciones y pulido          | ✅                              |
+| 7    | Deploy y endurecimiento       | 🟡 configurado, falta desplegar |
 
 ## Paquetes
 
@@ -157,6 +157,19 @@ el codigo:
 - **El countdown se deriva de `turnDeadline`**, un timestamp absoluto del
   servidor. El timer autoritativo vive alla; el cliente solo pinta pixeles.
 
+## Deploy
+
+Todo configurado: `Dockerfile`, `fly.toml`, `vercel.json` y `.env.example`.
+Los pasos para desplegar estan en **[DEPLOY.md](DEPLOY.md)**.
+
+Front a Vercel, servidor a Fly.io. Vercel no sirve para el servidor: sus
+funciones son efimeras y las conexiones WebSocket de larga duracion no son su
+modelo.
+
+El servidor **valida la config al arrancar** y falla con un mensaje claro si
+algo esta mal — fallar al arrancar es mucho mejor que fallar en la primera
+conexion con un error de CORS que desde el navegador se ve como "no conecta".
+
 ## Animaciones y sonido
 
 La carta que sale de tu mano y aparece en el descarte es **la misma** para
@@ -209,7 +222,7 @@ jugadores y falla si un `CardId` ajeno aparece en cualquier payload.
 ## Verificación
 
 ```
-165 tests (110 engine + 28 integracion + 27 cliente) · 96% de cobertura del engine
+180 tests (110 engine + 43 integracion + 27 cliente) · 96% de cobertura del engine
 1000 partidas de 10 jugadores simuladas, 0 violaciones de invariantes
 partida completa de 10 jugadores por sockets reales, 0 filtraciones
 ```

@@ -12,8 +12,21 @@ import { getPlayableCards } from '../rules.js';
 import type { GameState } from '../state.js';
 import { COLORS } from '../types.js';
 
-const GAMES = Number(process.argv[2] ?? 1000);
-const PLAYERS = Number(process.argv[3] ?? 10);
+// pnpm inyecta un `--` literal al reenviar argumentos: sin filtrarlo, GAMES
+// quedaba NaN, no se simulaba NADA y el script reportaba "OK" igual. El gate
+// de fase 1 pasaba en falso.
+const args = process.argv.slice(2).filter((a) => a !== '--');
+const GAMES = Number(args[0] ?? 1000);
+const PLAYERS = Number(args[1] ?? 10);
+
+if (!Number.isInteger(GAMES) || GAMES < 1) {
+  console.error(`Cantidad de partidas invalida: ${args[0]}`);
+  process.exit(1);
+}
+if (!Number.isInteger(PLAYERS) || PLAYERS < 2 || PLAYERS > 10) {
+  console.error(`Cantidad de jugadores invalida: ${args[1]} (tiene que ser 2..10)`);
+  process.exit(1);
+}
 const MAX_TURNS = 5000;
 
 interface Failure {
@@ -159,6 +172,11 @@ if (failures.length > 0) {
     console.log(`  seed=${f.seed} turno=${f.turn}: ${f.reason}`);
   }
   if (failures.length > 10) console.log(`  ... y ${failures.length - 10} mas`);
+  process.exit(1);
+}
+
+if (turnCounts.length === 0) {
+  console.error('\nERROR: no se completo ninguna partida.');
   process.exit(1);
 }
 

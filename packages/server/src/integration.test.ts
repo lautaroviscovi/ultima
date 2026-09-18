@@ -495,6 +495,31 @@ describe('timeout de turno', () => {
   });
 });
 
+describe('rate limiting', () => {
+  it('frena la creacion masiva de salas desde un mismo socket', async () => {
+    // Con el estado en memoria y sin base de datos, crear salas sin parar es
+    // el vector mas barato para tumbar el servidor.
+    const client = await spawn();
+    let rejected = 0;
+    for (let i = 0; i < 16; i++) {
+      const res = await client.createRoom(`P${i}`);
+      if (!res.ok && res.code === 'RATE_LIMITED') rejected++;
+    }
+    expect(rejected, 'el limite tiene que haber frenado algunas').toBeGreaterThan(0);
+  });
+
+  it('no frena a jugadores distintos: el limite es POR socket', async () => {
+    // Si fuese global, 10 personas entrando juntas a la misma sala se
+    // bloquearian entre si — que es justo el caso de uso del producto.
+    const { roomId } = await lobby(1);
+    for (let i = 0; i < 8; i++) {
+      const client = await spawn();
+      const res = await client.joinRoom(roomId, `Jugador${i}`);
+      expect(res.ok, `jugador ${i} deberia poder entrar`).toBe(true);
+    }
+  });
+});
+
 describe('health', () => {
   it('reporta las salas activas, para mirar antes de un redeploy', async () => {
     await lobby(3);

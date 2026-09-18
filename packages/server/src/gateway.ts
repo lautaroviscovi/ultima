@@ -74,7 +74,13 @@ function redactEvents(events: GameEvent[], viewerId: string): GameEvent[] {
   });
 }
 
-/** Limita comandos por socket. Un cliente legitimo manda unos pocos por segundo. */
+/**
+ * Limita acciones por socket. Un cliente legitimo manda unos pocos por segundo.
+ *
+ * El limite de comandos frena bucles; el de creacion de salas frena que alguien
+ * llene la memoria del servidor creando salas sin parar, que con el estado en
+ * memoria y sin base de datos es el vector mas barato de tumbar el server.
+ */
 class RateLimiter {
   private readonly hits = new Map<string, number[]>();
 
@@ -106,6 +112,8 @@ class RateLimiter {
  */
 export class Gateway {
   private readonly limiter = new RateLimiter(30, 1_000);
+  /** Crear/unirse es mucho mas caro que un comando: 10 cada 10 segundos. */
+  private readonly joinLimiter = new RateLimiter(10, 10_000);
 
   constructor(private readonly deps: GatewayDeps) {}
 
@@ -172,6 +180,11 @@ export class Gateway {
 
       socket.on('room:create', (payload, ack) => {
         try {
+          if (!this.joinLimiter.allow(socket.id, now())) {
+            throw Object.assign(new Error('Demasiadas salas creadas, esperá un momento'), {
+              code: 'RATE_LIMITED',
+            });
+          }
           const input = createRoomSchema.parse(payload);
           const { room, seat } = rooms.createRoom(
             input.nickname,
@@ -197,6 +210,11 @@ export class Gateway {
 
       socket.on('room:join', (payload, ack) => {
         try {
+          if (!this.joinLimiter.allow(socket.id, now())) {
+            throw Object.assign(new Error('Demasiados intentos, esperá un momento'), {
+              code: 'RATE_LIMITED',
+            });
+          }
           const input = joinRoomSchema.parse(payload);
           const { room, seat } = rooms.joinRoom(input.roomId, input.nickname, socket.id, now());
           this.bind(socket, room.id, seat.playerId, seat.playerToken);
@@ -343,6 +361,7 @@ export class Gateway {
 
       socket.on('disconnect', (reason) => {
         this.limiter.forget(socket.id);
+        this.joinLimiter.forget(socket.id);
         const result = rooms.handleDisconnect(socket.id, now());
         if (!result) return;
 
