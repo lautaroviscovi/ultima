@@ -7,6 +7,12 @@
 app = "uno-server"
 primary_region = "eze"   # Buenos Aires; cambiar si el equipo esta en otro lado
 
+# Margen para que el drain avise a los jugadores antes de cortar los sockets.
+# CUIDADO: estas dos claves son de la raiz. Si quedan despues de una tabla como
+# [[vm]], TOML las lee como parte de ESA tabla y se ignoran en silencio.
+kill_signal = "SIGTERM"
+kill_timeout = "15s"
+
 [build]
   dockerfile = "Dockerfile"
 
@@ -45,7 +51,3 @@ primary_region = "eze"   # Buenos Aires; cambiar si el equipo esta en otro lado
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
-
-# Margen para que el drain avise a los jugadores antes de cortar.
-kill_signal = "SIGTERM"
-kill_timeout = "15s"
