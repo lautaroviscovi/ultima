@@ -1,0 +1,25 @@
+{
+  "name": "@uno/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit || true",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@uno/engine": "workspace:*",
+    "@uno/protocol": "workspace:*",
+    "express": "^4.21.2",
+    "nanoid": "^5.0.9",
+    "pino": "^9.5.0",
+    "socket.io": "^4.8.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "socket.io-client": "^4.8.1",
+    "tsx": "^4.19.2"
+  }
+}
