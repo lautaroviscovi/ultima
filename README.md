@@ -19,7 +19,7 @@ existentes topan en 4.
 | ---- | ----------------------------- | ------ |
 | 0    | Andamiaje del monorepo        | ✅     |
 | 1    | Engine puro testeado, sin UI  | ✅     |
-| 2    | Server + protocolo, sin UI    | ⬜     |
+| 2    | Server + protocolo, sin UI    | ✅     |
 | 3    | Cliente: esqueleto y conexión | ⬜     |
 | 4    | Componentes en Storybook      | ⬜     |
 | 5    | Mesa de juego conectada       | ⬜     |
@@ -31,8 +31,8 @@ existentes topan en 4.
 ```
 packages/
 ├── engine/     @uno/engine    reglas puras, cero deps de red
-├── protocol/   @uno/protocol  eventos socket + schemas zod   (fase 2)
-├── server/     @uno/server    Socket.IO, salas, timers        (fase 2)
+├── protocol/   @uno/protocol  eventos socket + schemas zod
+├── server/     @uno/server    Socket.IO, salas, timers
 └── client/     @uno/client    React + Vite + Storybook        (fase 3)
 ```
 
@@ -52,7 +52,36 @@ pnpm sim          # gate de fase 1: 1000 partidas de 10 jugadores con bots
 pnpm sim -- 200 4 # 200 partidas de 4 jugadores
 pnpm lint
 pnpm typecheck
+
+# servidor
+pnpm --filter @uno/server dev            # arranca en :3000
+
+# cliente de terminal, para jugar sin UI
+pnpm --filter @uno/server cli -- --bots 9   # crea sala con 9 bots
+pnpm --filter @uno/server cli -- --room XK4T
 ```
+
+## Protocolo
+
+Socket.IO con genericos nativos: si se agrega un campo a `RedactedGameState`,
+el cliente no compila hasta manejarlo. Cada payload entrante pasa por un schema
+zod antes de tocar el engine.
+
+Decisiones que sostienen el protocolo:
+
+- **Estado completo en cada patch, no diffs.** Con 10 jugadores son pocos KB. Un
+  diff real seria optimizacion prematura y una fuente de desincronizacion.
+- **Solo comandos de jugador viajan por el cable.** `TIMEOUT`, `ABANDON`,
+  `DISCONNECT` y `NEXT_ROUND` los origina el servidor; aceptarlos del cliente
+  seria un vector de griefing trivial.
+- **El `playerId` sale del socket autenticado, nunca del payload**, o seria
+  suplantacion de identidad.
+- **Un error ilegal se responde SOLO al emisor.** Contarselo a los otros 9
+  revelaria que ese jugador tiene esa carta.
+- **`clientSeq` hace idempotentes los reintentos** y `expectedVersion` rechaza
+  comandos emitidos desde un estado viejo (`STALE_COMMAND` + resync).
+- **El `playerToken` va solo en el ack**, jamas en un broadcast: es la
+  credencial del asiento, y no hay login.
 
 ## Reglas implementadas
 
@@ -103,8 +132,9 @@ jugadores y falla si un `CardId` ajeno aparece en cualquier payload.
 ## Verificación
 
 ```
-110 tests · 96% de cobertura del engine
+138 tests (110 del engine + 28 de integracion) · 96% de cobertura del engine
 1000 partidas de 10 jugadores simuladas, 0 violaciones de invariantes
+partida completa de 10 jugadores por sockets reales, 0 filtraciones
 ```
 
 Invariantes chequeadas en cada paso: siempre 108 cartas, ningún `CardId`
