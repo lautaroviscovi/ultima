@@ -1,74 +1,275 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { isWild, type Card, type Color } from '@uno/engine';
+import {
+  callOutUno,
+  chooseColor,
+  declareUno,
+  drawCard,
+  leaveRoom,
+  nextRound,
+  playCard,
+  playDrawnCard,
+  resumeSession,
+} from '../net/commands.js';
 import { useGameStore } from '../stores/game.js';
-import { useIsMyTurn, useOpponents, usePlayableCards, useSortedHand } from '../hooks/useGame.js';
-import { cardLabel } from '@uno/engine';
+import { useSessionStore } from '../stores/session.js';
+import { useUIStore } from '../stores/ui.js';
+import {
+  useConnection,
+  useIsMyTurn,
+  useOpponents,
+  usePlayableCards,
+  useSortedHand,
+  useSortMode,
+} from '../hooks/useGame.js';
+import { useTurnTimer } from '../hooks/useTurnTimer.js';
+import { useEventLog } from '../hooks/useEventLog.js';
+import { ColorPicker } from '../components/ColorPicker.js';
+import { ConnectionBadge } from '../components/ConnectionBadge.js';
+import { ErrorToast } from '../components/ErrorToast.js';
+import { EventLog } from '../components/EventLog.js';
+import { RoundOverlay } from '../components/RoundOverlay.js';
+import { MIN_WIDTH, TableLayout } from '../components/TableLayout.js';
 
-/**
- * Placeholder de la mesa. La mesa real (arco de asientos, animaciones) es la
- * fase 5; esto existe para verificar de punta a punta que el estado llega
- * redactado y que los selectores derivados funcionan.
- */
 export function Table(): JSX.Element {
   const { code = '' } = useParams();
   const navigate = useNavigate();
+  const roomId = code.toUpperCase();
+
   const state = useGameStore((s) => s.state);
+  const room = useGameStore((s) => s.room);
+  const lastError = useGameStore((s) => s.lastError);
+  const setError = useGameStore((s) => s.setError);
+  const session = useSessionStore((s) => s.sessions[roomId]);
+
   const hand = useSortedHand();
   const playable = usePlayableCards();
   const opponents = useOpponents();
-  const myTurn = useIsMyTurn();
+  const isMyTurn = useIsMyTurn();
+  const connection = useConnection();
+  const timer = useTurnTimer();
+  const log = useEventLog();
+  const [sortMode, setSortMode] = useSortMode();
+
+  const colorPickerOpen = useUIStore((s) => s.colorPickerOpen);
+  const pendingWildCardId = useUIStore((s) => s.pendingWildCardId);
+  const cardsInFlight = useUIStore((s) => s.cardsInFlight);
+  const openColorPicker = useUIStore((s) => s.openColorPicker);
+  const closeColorPicker = useUIStore((s) => s.closeColorPicker);
+
+  const [tooNarrow, setTooNarrow] = useState(() => window.innerWidth < MIN_WIDTH);
+  const [reverseFlash, setReverseFlash] = useState(false);
+  const lastDirection = useRef<1 | -1 | null>(null);
+
+  // Sin sesion no hay asiento que reclamar.
+  useEffect(() => {
+    if (!session) {
+      navigate('/', { replace: true });
+      return;
+    }
+    void resumeSession(roomId).then((res) => {
+      if (res && !res.ok) navigate('/', { replace: true });
+    });
+  }, [roomId, session, navigate]);
+
+  // Todavia en lobby: volvemos ahi.
+  useEffect(() => {
+    if (state?.phase === 'lobby') navigate(`/room/${roomId}`, { replace: true });
+  }, [state?.phase, roomId, navigate]);
+
+  useEffect(() => {
+    const onResize = (): void => setTooNarrow(window.innerWidth < MIN_WIDTH);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  /**
+   * El reverse es la jugada que mas confunde en UNO online: cuando cambia la
+   * direccion, lo marcamos explicitamente en vez de esperar que lo deduzcan
+   * del orden de los turnos.
+   */
+  useEffect(() => {
+    if (!state) return;
+    if (lastDirection.current !== null && lastDirection.current !== state.direction) {
+      setReverseFlash(true);
+      const id = setTimeout(() => setReverseFlash(false), 900);
+      return () => clearTimeout(id);
+    }
+    lastDirection.current = state.direction;
+    return;
+  }, [state?.direction, state]);
+
+  /**
+   * Jugar una carta. Un wild necesita color ANTES de mandarse: el comando
+   * viaja con el color elegido en vez de dejar la partida en choosing_color,
+   * que seria un round-trip extra.
+   */
+  const handlePlay = useCallback(
+    (card: Card) => {
+      if (!state) return;
+      const fromDrawn = state.phase === 'card_drawn';
+
+      if (isWild(card)) {
+        openColorPicker(card.id);
+        return;
+      }
+
+      // declareUno va en el MISMO comando que la jugada: eso elimina la carrera
+      // de red donde declaras legitimamente pero el paquete llega tarde.
+      const declaring = hand.length === 2;
+      void (fromDrawn
+        ? playDrawnCard({ declareUno: declaring })
+        : playCard(card.id, { declareUno: declaring }));
+    },
+    [state, hand.length, openColorPicker],
+  );
+
+  const handleColorPick = useCallback(
+    (color: Color) => {
+      const cardId = pendingWildCardId;
+      closeColorPicker();
+      if (!state) return;
+
+      /**
+       * Sin carta pendiente, el color lo esta pidiendo el SERVIDOR: pasa cuando
+       * la carta inicial volteada es un wild y el primer jugador tiene que
+       * elegir antes de jugar. Ahi va el comando CHOOSE_COLOR suelto.
+       */
+      if (!cardId) {
+        void chooseColor(color);
+        return;
+      }
+
+      // Con carta pendiente, el color viaja EN el mismo comando que la jugada:
+      // un round-trip menos y sin pasar por la fase choosing_color.
+      const declaring = hand.length === 2;
+      void (state.phase === 'card_drawn'
+        ? playDrawnCard({ chosenColor: color, declareUno: declaring })
+        : playCard(cardId, { chosenColor: color, declareUno: declaring }));
+    },
+    [pendingWildCardId, closeColorPicker, state, hand.length],
+  );
+
+  const handleDraw = useCallback(() => {
+    void drawCard();
+  }, []);
+
+  const handleDeclareUno = useCallback(() => {
+    void declareUno();
+  }, []);
+
+  const handleCallOut = useCallback((playerId: string) => {
+    void callOutUno(playerId);
+  }, []);
+
+  const handleLeave = useCallback(() => {
+    void leaveRoom(roomId).then(() => navigate('/'));
+  }, [roomId, navigate]);
 
   if (!state) {
     return (
-      <main className="min-h-screen bg-felt-dark text-white flex items-center justify-center">
-        <button onClick={() => navigate(`/room/${code}`)} className="text-white/60 underline">
-          Volver al lobby
-        </button>
+      <main className="flex min-h-screen items-center justify-center bg-felt-dark text-white/60">
+        Conectando…
       </main>
     );
   }
 
+  // Desktop-only por decision de producto: aviso claro en vez de layout roto.
+  if (tooNarrow) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-felt-dark p-8 text-center text-white">
+        <p className="text-xl font-bold">Necesitás una ventana más ancha</p>
+        <p className="max-w-sm text-white/60">
+          La mesa de hasta 10 jugadores necesita al menos {MIN_WIDTH}px para que se lea bien.
+          Agrandá la ventana o pasá a una pantalla más grande.
+        </p>
+      </main>
+    );
+  }
+
+  const isHost = room?.hostId === session?.playerId;
+  const unoWindowFor =
+    state.unoWindow && state.unoWindow.playerId !== state.you.id ? state.unoWindow.playerId : null;
+
   return (
-    <main className="min-h-screen bg-felt-dark text-white p-6">
-      <p className="mb-4 text-sm text-white/50">
-        Mesa provisoria — la mesa real llega en la fase 5
-      </p>
-
-      <div className="mb-6 flex flex-wrap gap-2">
-        {opponents.map((p) => (
-          <div
-            key={p.id}
-            className={`rounded-lg px-3 py-2 ${
-              p.id === state.currentPlayerId ? 'bg-uno-yellow text-black' : 'bg-white/10'
-            }`}
-          >
-            <div className="font-bold">{p.nickname}</div>
-            <div className="text-sm">
-              {p.cardCount} cartas · {p.score} pts
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <p className="mb-2">
-        descarte: <b>{state.discardTop ? cardLabel(state.discardTop) : '—'}</b> · color activo:{' '}
-        <b>{state.activeColor}</b> · mazo: {state.drawPileCount}
-      </p>
-      <p className="mb-4">
-        fase: {state.phase} {myTurn && <b className="text-uno-green">· TE TOCA</b>}
-      </p>
-
-      <div className="flex flex-wrap gap-2">
-        {hand.map((card) => (
+    <main className="relative min-h-screen bg-felt-dark">
+      <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
+        <ConnectionBadge status={connection} />
+        <span className="rounded-full bg-black/30 px-3 py-1 font-mono text-xs text-white/60">
+          {roomId}
+        </span>
+        {isMyTurn && timer.secondsLeft <= 15 && (
           <span
-            key={card.id}
-            className={`rounded px-3 py-2 ${
-              playable.has(card.id) ? 'bg-white text-black font-bold' : 'bg-white/10 text-white/40'
+            className={`rounded-full px-3 py-1 text-xs font-bold ${
+              timer.secondsLeft <= 5 ? 'bg-uno-red text-white' : 'bg-uno-yellow text-black'
             }`}
           >
-            {cardLabel(card)}
+            {timer.secondsLeft}s
           </span>
-        ))}
+        )}
       </div>
+
+      <div className="absolute right-3 top-3 z-20 flex items-center gap-2">
+        <button
+          onClick={() =>
+            setSortMode(sortMode === 'draw' ? 'color' : sortMode === 'color' ? 'value' : 'draw')
+          }
+          className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
+        >
+          orden: {sortMode === 'draw' ? 'robo' : sortMode === 'color' ? 'color' : 'valor'}
+        </button>
+        <button
+          onClick={handleLeave}
+          className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
+        >
+          salir
+        </button>
+      </div>
+
+      <TableLayout
+        opponents={opponents}
+        hand={hand}
+        playable={playable}
+        inFlight={cardsInFlight}
+        currentPlayerId={state.currentPlayerId}
+        myId={state.you.id}
+        discardTop={state.discardTop}
+        activeColor={state.activeColor}
+        drawPileCount={state.drawPileCount}
+        direction={state.direction}
+        turnProgress={timer.progress}
+        isMyTurn={isMyTurn}
+        unoWindowFor={unoWindowFor}
+        reverseFlash={reverseFlash}
+        onPlay={handlePlay}
+        onDraw={handleDraw}
+        onCallOut={handleCallOut}
+        onDeclareUno={handleDeclareUno}
+      />
+
+      <EventLog entries={log} />
+
+      {/*
+        Se abre por dos caminos: clickeaste un wild (pendingWildCardId), o el
+        servidor esta en choosing_color y te toca a vos — que pasa cuando la
+        carta inicial volteada es un wild. Sin el segundo, la partida quedaria
+        colgada esperando un color que nadie puede mandar.
+      */}
+      <ColorPicker
+        open={colorPickerOpen || (state.phase === 'choosing_color' && isMyTurn)}
+        onPick={handleColorPick}
+        {...(colorPickerOpen ? { onCancel: closeColorPicker } : {})}
+      />
+
+      <RoundOverlay
+        state={state}
+        isHost={Boolean(isHost)}
+        onNextRound={() => void nextRound()}
+        onLeave={handleLeave}
+      />
+
+      <ErrorToast error={lastError} onDismiss={() => setError(null)} />
     </main>
   );
 }

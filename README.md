@@ -22,7 +22,7 @@ existentes topan en 4.
 | 2    | Server + protocolo, sin UI    | ✅     |
 | 3    | Cliente: esqueleto y conexión | ✅     |
 | 4    | Componentes en Storybook      | ✅     |
-| 5    | Mesa de juego conectada       | ⬜     |
+| 5    | Mesa de juego conectada       | ✅     |
 | 6    | Animaciones y pulido          | ⬜     |
 | 7    | Deploy y endurecimiento       | ⬜     |
 
@@ -142,6 +142,20 @@ atencion: anillo de progreso (turno + urgencia en un elemento), atenuacion de
 los demas, elevacion del activo, y cambio del marco entero cuando te toca.
 Con gente en videollamada la atencion esta partida y no se puede asumir que
 esten mirando la mesa.
+
+## La mesa conectada
+
+Los componentes de la fase 4 cableados al store. Tres decisiones que se ven en
+el codigo:
+
+- **Un comando no toca el estado de juego.** En el camino feliz solo se marca
+  la carta como "volando" (optimismo visual); el `state:patch` que llega
+  despues es la verdad. Si el servidor rechaza, la carta vuelve a la mano.
+- **El color de un wild viaja EN el comando de la jugada**, no como una fase
+  aparte: un round-trip menos. El `CHOOSE_COLOR` suelto queda para cuando el
+  color lo pide el servidor, que pasa si la carta inicial volteada es un wild.
+- **El countdown se deriva de `turnDeadline`**, un timestamp absoluto del
+  servidor. El timer autoritativo vive alla; el cliente solo pinta pixeles.
 
 ## Sesion e identidad
 
