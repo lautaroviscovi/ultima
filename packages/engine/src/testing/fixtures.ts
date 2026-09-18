@@ -5,7 +5,13 @@
  * modo que si cambia GameState/RedactedGameState rompe la compilacion en ambos
  * lados a la vez en vez de dejar las stories mintiendo.
  */
-import { DEFAULT_OPTIONS, type GameState, type Player } from '../state.js';
+import {
+  DEFAULT_OPTIONS,
+  type GameState,
+  type Player,
+  type RedactedGameState,
+  type RedactedPlayer,
+} from '../state.js';
 import type { Card, Color, NumberValue } from '../types.js';
 
 let counter = 0;
@@ -77,6 +83,84 @@ export function makeState(opts: MakeStateOptions = {}): GameState {
     discardPile: opts.discardPile ?? [],
     activeColor: opts.activeColor ?? 'red',
     currentPlayerIndex: opts.currentPlayerIndex ?? 0,
+    direction: opts.direction ?? 1,
+    phase: opts.phase ?? 'awaiting_turn',
+    pendingDraw: 0,
+    drawnCardId: null,
+    unoWindow: null,
+    turnDeadline: 0,
+    roundWinnerId: null,
+    gameWinnerId: null,
+    version: 1,
+  };
+}
+
+/** Un jugador tal como lo ve otro: solo conteo, jamas cartas. */
+export function makeRedactedPlayer(
+  overrides: Partial<RedactedPlayer> & { seat: number },
+): RedactedPlayer {
+  return {
+    id: `p${overrides.seat}`,
+    nickname: `Jugador ${overrides.seat + 1}`,
+    cardCount: 7,
+    connected: true,
+    idle: false,
+    abandoned: false,
+    hasDeclaredUno: false,
+    score: 0,
+    ...overrides,
+  };
+}
+
+export interface MakeRedactedOptions {
+  playerCount?: number;
+  /** Cartas de TU mano. Por defecto una mano variada de 7. */
+  yourHand?: Card[];
+  /** Asiento en turno. Por defecto 1 (un oponente), no vos: es el caso comun. */
+  currentSeat?: number;
+  discardTop?: Card;
+  activeColor?: Color;
+  direction?: 1 | -1;
+  phase?: RedactedGameState['phase'];
+  drawPileCount?: number;
+  /** Conteos ajenos, por asiento. Util para probar UNO y manos grandes. */
+  cardCounts?: number[];
+}
+
+/**
+ * Vista redactada lista para stories y tests. Los usan ambos: una sola fuente,
+ * de modo que si cambia RedactedGameState rompe compilacion en los dos lados.
+ */
+export function makeRedactedState(opts: MakeRedactedOptions = {}): RedactedGameState {
+  const playerCount = opts.playerCount ?? 4;
+  const yourHand = opts.yourHand ?? [
+    num('red', 5),
+    num('blue', 9),
+    colored('skip', 'green'),
+    wild(),
+    num('yellow', 0),
+    colored('draw2', 'red'),
+    wild4(),
+  ];
+
+  const players = Array.from({ length: playerCount }, (_, seat) =>
+    makeRedactedPlayer({
+      seat,
+      ...(seat === 0 ? { cardCount: yourHand.length } : {}),
+      ...(opts.cardCounts?.[seat] !== undefined ? { cardCount: opts.cardCounts[seat]! } : {}),
+    }),
+  );
+
+  return {
+    roomId: 'TEST',
+    round: 0,
+    options: DEFAULT_OPTIONS,
+    you: { id: 'p0', hand: yourHand },
+    players,
+    discardTop: opts.discardTop ?? num('red', 3),
+    activeColor: opts.activeColor ?? 'red',
+    drawPileCount: opts.drawPileCount ?? 60,
+    currentPlayerId: `p${opts.currentSeat ?? 1}`,
     direction: opts.direction ?? 1,
     phase: opts.phase ?? 'awaiting_turn',
     pendingDraw: 0,

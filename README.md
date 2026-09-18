@@ -21,7 +21,7 @@ existentes topan en 4.
 | 1    | Engine puro testeado, sin UI  | ✅     |
 | 2    | Server + protocolo, sin UI    | ✅     |
 | 3    | Cliente: esqueleto y conexión | ✅     |
-| 4    | Componentes en Storybook      | ⬜     |
+| 4    | Componentes en Storybook      | ✅     |
 | 5    | Mesa de juego conectada       | ⬜     |
 | 6    | Animaciones y pulido          | ⬜     |
 | 7    | Deploy y endurecimiento       | ⬜     |
@@ -33,7 +33,7 @@ packages/
 ├── engine/     @uno/engine    reglas puras, cero deps de red
 ├── protocol/   @uno/protocol  eventos socket + schemas zod
 ├── server/     @uno/server    Socket.IO, salas, timers
-└── client/     @uno/client    React + Vite + Zustand
+└── client/     @uno/client    React + Vite + Zustand + Storybook
 ```
 
 Grafo estrictamente acíclico: `engine ← protocol ← server`, y `client → engine, protocol`.
@@ -56,6 +56,7 @@ pnpm typecheck
 # servidor y cliente (uno en cada terminal)
 pnpm --filter @uno/server dev            # :3000
 pnpm --filter @uno/client dev            # :5173
+pnpm --filter @uno/client storybook      # :6006
 
 # cliente de terminal, para jugar sin UI.
 # OJO: el servidor tiene que estar corriendo en OTRA terminal.
@@ -121,6 +122,27 @@ Los que rompen implementaciones de UNO, cada uno con test dedicado:
 - **Desconexión ≠ abandono**: el timer no se pausa, porque pausarlo deja que una
   conexión mala congele a los otros 9.
 
+## El layout de 10 jugadores
+
+El diferencial del producto vive en `TableLayout` y su geometria
+(`components/seats.ts`), y se valida en Storybook sin cablear nada: la story
+`TableLayout` tiene un control de 2 a 10 jugadores y una vista con los nueve
+layouts juntos.
+
+Las dos decisiones que lo hacen posible:
+
+- **Tu mano NO es un asiento.** Es UI separada, fija abajo y a tamaño completo.
+  Eso libera el borde inferior, que es el espacio mas valioso.
+- **El asiento tiene tamaño FIJO.** Lo que varia es la separacion angular sobre
+  un arco de 280 grados, no el tamaño. Escalar todo hacia abajo es exactamente
+  lo que hacen mal las plataformas que topan en 4-8 jugadores.
+
+El turno se señala con cuatro señales simultaneas a distinta escala de
+atencion: anillo de progreso (turno + urgencia en un elemento), atenuacion de
+los demas, elevacion del activo, y cambio del marco entero cuando te toca.
+Con gente en videollamada la atencion esta partida y no se puede asumir que
+esten mirando la mesa.
+
 ## Sesion e identidad
 
 El `playerToken` es la credencial del asiento: no hay login. Se guarda en
@@ -151,7 +173,7 @@ jugadores y falla si un `CardId` ajeno aparece en cualquier payload.
 ## Verificación
 
 ```
-144 tests (110 engine + 28 integracion + 6 cliente) · 96% de cobertura del engine
+160 tests (110 engine + 28 integracion + 22 cliente) · 96% de cobertura del engine
 1000 partidas de 10 jugadores simuladas, 0 violaciones de invariantes
 partida completa de 10 jugadores por sockets reales, 0 filtraciones
 ```

@@ -191,7 +191,10 @@ describe('partida de 10 jugadores', () => {
 
     for (const client of all) {
       const state = client.state!;
-      expect(state.you.hand).toHaveLength(7);
+      // 7 normalmente, pero si la carta inicial fue un draw2 el primer jugador
+      // arranca con 9. Asumir 7 fijo hacia el test flaky segun el seed.
+      expect(state.you.hand.length).toBeGreaterThanOrEqual(7);
+      expect(state.you.hand.length).toBeLessThanOrEqual(9);
       expect(state.players).toHaveLength(10);
       for (const other of state.players) {
         expect(other.cardCount).toBeGreaterThan(0);
@@ -347,17 +350,20 @@ describe('comandos ilegales', () => {
     // Ojo: el turno puede no ser del asiento 0 (la carta inicial pudo ser un
     // skip/reverse/draw2), asi que lo tomamos del estado propio de cada cliente.
     const client = turnHolder(all);
+    // Solo tiene sentido robar en awaiting_turn: esperamos esa fase en vez de
+    // asumirla, o el test depende del seed.
+    await client.waitFor(() => client.state?.phase === 'awaiting_turn', 2000, 'fase awaiting_turn');
     const handBefore = client.state!.you.hand.length;
 
     const first = await client.command({ type: 'DRAW_CARD' }, { clientSeq: 7 });
-    expect(first.ok).toBe(true);
+    expect(first.ok, first.ok ? '' : `${first.code}: ${first.message}`).toBe(true);
     await client.waitFor(() => client.state!.you.hand.length > handBefore, 2000, 'robo');
     const afterFirst = client.state!.you.hand.length;
 
     // Reintento del MISMO clientSeq, como haria un cliente tras un timeout de
-    // red. Debe responder ok (idempotente) pero no robar otra carta.
+    // red. El servidor responde ok sin volver a aplicarlo.
     const retry = await client.command({ type: 'DRAW_CARD' }, { clientSeq: 7 });
-    expect(retry.ok).toBe(true);
+    expect(retry.ok, retry.ok ? '' : `${retry.code}: ${retry.message}`).toBe(true);
     await new Promise((r) => setTimeout(r, 80));
     expect(client.state!.you.hand.length).toBe(afterFirst);
   });
