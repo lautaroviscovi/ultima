@@ -13,7 +13,8 @@ import type { ClientToServerEvents, PlayerCommand, ServerToClientEvents } from '
 
 type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
-const args = process.argv.slice(2);
+// pnpm inyecta un `--` literal al reenviar argumentos; lo descartamos.
+const args = process.argv.slice(2).filter((a) => a !== '--');
 const flag = (name: string): string | undefined => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : undefined;
@@ -94,12 +95,19 @@ function render(state: RedactedGameState, myId: string): void {
 /** Bot que juega legal. Sirve para llenar la mesa y probar con 10. */
 async function runBot(roomId: string, index: number): Promise<void> {
   const socket: ClientSocket = connect(url, { transports: ['websocket'] });
-  await new Promise<void>((r) => socket.once('connect', () => r()));
-  const join = await emit<{ ok: boolean; playerId?: string }>(socket, 'room:join', {
-    roomId,
-    nickname: `Bot${index}`,
+  await new Promise<void>((resolve, reject) => {
+    socket.once('connect', () => resolve());
+    socket.once('connect_error', (err) => reject(err));
   });
-  if (!join.ok || !join.playerId) return;
+  const join = await emit<{ ok: boolean; message?: string; playerId?: string }>(
+    socket,
+    'room:join',
+    { roomId, nickname: `Bot${index}` },
+  );
+  if (!join.ok || !join.playerId) {
+    console.error(`  no pude sumar Bot${index}: ${join.message ?? 'error'}`);
+    return;
+  }
   const myId = join.playerId;
   let seq = 0;
 
@@ -124,10 +132,20 @@ async function runBot(roomId: string, index: number): Promise<void> {
 
 async function main(): Promise<void> {
   const socket: ClientSocket = connect(url, { transports: ['websocket'] });
-  await new Promise<void>((resolve, reject) => {
-    socket.once('connect', () => resolve());
-    socket.once('connect_error', (err) => reject(err));
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      socket.once('connect', () => resolve());
+      socket.once('connect_error', (err) => reject(err));
+    });
+  } catch {
+    // Sin esto, un servidor apagado escupe 80 lineas de TransportError que no
+    // dicen que hacer. El caso comun es justamente que no lo arrancaste.
+    console.error(`\n  No pude conectarme a ${url}\n`);
+    console.error('  El servidor tiene que estar corriendo EN OTRA TERMINAL:');
+    console.error('    pnpm --filter @uno/server dev\n');
+    console.error('  Si corre en otro puerto:  --url http://localhost:PUERTO\n');
+    process.exit(1);
+  }
 
   const res = roomArg
     ? await emit<{ ok: boolean; message?: string; playerId?: string; roomId?: string }>(
@@ -174,8 +192,21 @@ async function main(): Promise<void> {
     '  comandos: start | <n> jugar | d robar | p pasar | c <color> | u uno | !<id> acusar | q salir\n',
   );
 
+  // stdin cerrado (Ctrl+D, o input piped que se agoto) cierra el readline y
+  // question() lanza ERR_USE_AFTER_CLOSE. Lo tratamos como una salida normal.
+  let stdinOpen = true;
+  rl.once('close', () => {
+    stdinOpen = false;
+  });
+
   for (;;) {
-    const line = (await rl.question('> ')).trim();
+    if (!stdinOpen) break;
+    let line: string;
+    try {
+      line = (await rl.question('> ')).trim();
+    } catch {
+      break;
+    }
     if (line === 'q') break;
 
     if (line === 'start') {

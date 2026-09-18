@@ -56,9 +56,11 @@ pnpm typecheck
 # servidor
 pnpm --filter @uno/server dev            # arranca en :3000
 
-# cliente de terminal, para jugar sin UI
-pnpm --filter @uno/server cli -- --bots 9   # crea sala con 9 bots
-pnpm --filter @uno/server cli -- --room XK4T
+# cliente de terminal, para jugar sin UI.
+# OJO: el servidor tiene que estar corriendo en OTRA terminal.
+pnpm --filter @uno/server cli -- --bots 9    # crea sala con 9 bots
+pnpm --filter @uno/server cli -- --room XK4T # se une a una sala
+pnpm --filter @uno/server cli -- --url http://localhost:4000
 ```
 
 ## Protocolo
