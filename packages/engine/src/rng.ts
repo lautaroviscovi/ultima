@@ -36,7 +36,11 @@ function hashSeed(seed: string): number {
   return h >>> 0;
 }
 
-export function createRng(seed: string): Rng {
+/**
+ * Crea un Rng. `skip` avanza el stream esa cantidad de consumos, para
+ * reconstruir una posicion guardada (ver `restoreRng`).
+ */
+export function createRng(seed: string, skip = 0): Rng {
   let gen = prand.xoroshiro128plus(hashSeed(seed));
   let consumed = 0;
 
@@ -49,6 +53,11 @@ export function createRng(seed: string): Rng {
     consumed++;
     return value;
   };
+
+  // Avanzar el stream es la unica forma de reconstruir la posicion: xoroshiro
+  // no permite "saltar" a un estado arbitrario. Es O(skip), pero una partida
+  // larga consume unos pocos miles de valores, asi que es instantaneo.
+  for (let i = 0; i < skip; i++) nextInt(2);
 
   return {
     nextInt,
@@ -72,4 +81,26 @@ export function createRng(seed: string): Rng {
       return consumed;
     },
   };
+}
+
+/**
+ * Posicion del stream, para guardarla junto al estado.
+ *
+ * El Rng vive FUERA del GameState serializable (ver `rngs` en game.ts), asi que
+ * al restaurar un estado desde disco el stream volveria a la posicion 0 y
+ * cualquier consumo posterior — re-barajar el descarte, elegir color por
+ * timeout, repartir las cartas de un abandonado — daria un resultado distinto
+ * al de la partida original. El replay `(seed, comandos)` dejaria de valer en
+ * silencio.
+ */
+export function exportRngState(rng: Rng): number {
+  return rng.consumed;
+}
+
+/** Reconstruye un stream en la posicion guardada por `exportRngState`. */
+export function restoreRng(seed: string, consumed: number): Rng {
+  if (!Number.isInteger(consumed) || consumed < 0) {
+    throw new Error(`posicion de rng invalida: ${consumed}`);
+  }
+  return createRng(seed, consumed);
 }

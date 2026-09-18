@@ -1,5 +1,5 @@
 import { buildShuffledDeck } from './deck.js';
-import { createRng, type Rng } from './rng.js';
+import { createRng, restoreRng, type Rng } from './rng.js';
 import { activePlayers, isPlayable, nextPlayerIndex, scoreRound } from './rules.js';
 import { DEFAULT_OPTIONS, type GameOptions, type GameState, type Player } from './state.js';
 import {
@@ -41,6 +41,30 @@ function rngFor(state: GameState): Rng {
 /** Libera el stream de una partida terminada. El server lo llama al cerrar la sala. */
 export function disposeGame(state: GameState): void {
   rngs.delete(`${state.roomId}:${state.seed}`);
+}
+
+/**
+ * Posicion del stream de una partida, para guardarla junto al GameState.
+ *
+ * El Rng vive FUERA del estado serializable a proposito (arriba), asi que
+ * serializar solo el GameState NO alcanza para reanudar una partida: el stream
+ * volveria a la posicion 0 y cualquier consumo posterior — re-barajar el
+ * descarte, elegir color por timeout, repartir las cartas de un abandonado —
+ * daria un resultado distinto al de la partida original, rompiendo el replay
+ * `(seed, comandos)` en silencio.
+ *
+ * Un snapshot fiel es `{ state, rngConsumed }`.
+ */
+export function exportRngPosition(state: GameState): number {
+  return rngFor(state).consumed;
+}
+
+/**
+ * Reinstala el stream de una partida restaurada en su posicion guardada.
+ * Hay que llamarlo ANTES del primer `reduce` sobre el estado rehidratado.
+ */
+export function restoreRngPosition(state: GameState, consumed: number): void {
+  rngs.set(`${state.roomId}:${state.seed}`, restoreRng(state.seed, consumed));
 }
 
 export function createGame(input: CreateGameInput): ReduceResult {
