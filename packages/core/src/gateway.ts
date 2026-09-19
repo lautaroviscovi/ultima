@@ -1,4 +1,3 @@
-import type { Server, Socket } from 'socket.io';
 import { GameError, type GameEvent } from '@uno/engine';
 import {
   commandEnvelopeSchema,
@@ -7,37 +6,27 @@ import {
   resumeSessionSchema,
   startGameSchema,
   type Ack,
-  type ClientToServerEvents,
-  type InterServerEvents,
   type ProtocolErrorCode,
-  type ServerToClientEvents,
-  type SocketData,
 } from '@uno/protocol';
 import { z } from 'zod';
 import type { Room, RoomManager } from './RoomManager.js';
-import type { TurnScheduler } from './TurnScheduler.js';
-import type { Logger } from './logger.js';
+import type { Emitter, Logger, Scheduler } from './ports.js';
 import { compact } from './compact.js';
-
-export type UnoServer = Server<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  InterServerEvents,
-  SocketData
->;
-export type UnoSocket = Socket<
-  ClientToServerEvents,
-  ServerToClientEvents,
-  InterServerEvents,
-  SocketData
->;
-
 export interface GatewayDeps {
-  io: UnoServer;
+  /** El transporte. Node usa Socket.IO; el Worker, WebSocket nativo. */
+  emitter: Emitter;
   rooms: RoomManager;
-  scheduler: TurnScheduler;
+  scheduler: Scheduler;
   logger: Logger;
   now: () => number;
+}
+
+/** Contexto de una conexion, equivalente al `socket.data` de Socket.IO. */
+export interface ConnectionContext {
+  connectionId: string;
+  playerId: string | null;
+  roomId: string | null;
+  playerToken: string | null;
 }
 
 function toErrorCode(error: unknown): { code: ProtocolErrorCode; message: string } {
@@ -119,14 +108,14 @@ export class Gateway {
 
   /** Emite el estado a cada jugador conectado, redactado por destinatario. */
   broadcastState(room: Room, events: GameEvent[] = []): void {
-    const { io, rooms } = this.deps;
+    const { emitter, rooms } = this.deps;
     if (!room.game) return;
 
     for (const seat of room.seats) {
       if (!seat.socketId || !seat.connected) continue;
       const state = rooms.viewFor(room, seat.playerId);
       if (!state) continue;
-      io.to(seat.socketId).emit('state:patch', {
+      emitter.push(seat.socketId, 'state:patch', {
         state,
         events: redactEvents(events, seat.playerId),
       });
@@ -136,13 +125,13 @@ export class Gateway {
 
   syncOne(room: Room, playerId: string, socketId: string): void {
     const state = this.deps.rooms.viewFor(room, playerId);
-    if (state) this.deps.io.to(socketId).emit('state:sync', state);
+    if (state) this.deps.emitter.push(socketId, 'state:sync', state);
   }
 
   broadcastRoom(room: Room): void {
     const view = this.deps.rooms.redactRoom(room);
     for (const seat of room.seats) {
-      if (seat.socketId) this.deps.io.to(seat.socketId).emit('room:updated', view);
+      if (seat.socketId) this.deps.emitter.push(seat.socketId, 'room:updated', view);
     }
   }
 
@@ -170,107 +159,102 @@ export class Gateway {
     scheduler.schedule(room.id, game.turnDeadline, now());
   }
 
-  register(): void {
-    const { io, rooms, logger, now } = this.deps;
+  /**
+   * Procesa un evento del cliente y devuelve el ack.
+   *
+   * Reemplaza los handlers anidados de `io.on('connection')`: el transporte
+   * decide como recibe el mensaje y como devuelve la respuesta; esta capa solo
+   * hace la logica. Es lo que permite el mismo Gateway sobre Socket.IO y sobre
+   * WebSocket nativo.
+   */
+  async dispatch(
+    ctx: ConnectionContext,
+    event: string,
+    payload: unknown,
+  ): Promise<Ack<Record<string, unknown>>> {
+    const { rooms, logger, now } = this.deps;
 
-    io.on('connection', (socket: UnoSocket) => {
-      socket.data.playerId = null;
-      socket.data.roomId = null;
-      socket.data.playerToken = null;
-
-      socket.on('room:create', (payload, ack) => {
-        try {
-          if (!this.joinLimiter.allow(socket.id, now())) {
-            throw Object.assign(new Error('Demasiadas salas creadas, esperá un momento'), {
-              code: 'RATE_LIMITED',
-            });
-          }
+    try {
+      switch (event) {
+        case 'room:create': {
+          this.requireQuota(this.joinLimiter, ctx, 'Demasiadas salas creadas, esperá un momento');
           const input = createRoomSchema.parse(payload);
           const { room, seat } = rooms.createRoom(
             input.nickname,
-            socket.id,
+            ctx.connectionId,
             now(),
             compact(input.options),
           );
-          this.bind(socket, room.id, seat.playerId, seat.playerToken);
-
+          this.bind(ctx, room.id, seat.playerId, seat.playerToken);
           logger.info({ roomId: room.id, playerId: seat.playerId }, 'sala creada');
-          ack({
+          return {
             ok: true,
             // El token va SOLO en el ack, jamas en un broadcast: es la credencial.
             playerToken: seat.playerToken,
             playerId: seat.playerId,
             roomId: room.id,
             room: rooms.redactRoom(room),
-          });
-        } catch (error) {
-          ack(fail(error));
+          };
         }
-      });
 
-      socket.on('room:join', (payload, ack) => {
-        try {
-          if (!this.joinLimiter.allow(socket.id, now())) {
-            throw Object.assign(new Error('Demasiados intentos, esperá un momento'), {
-              code: 'RATE_LIMITED',
-            });
-          }
+        case 'room:join': {
+          this.requireQuota(this.joinLimiter, ctx, 'Demasiados intentos, esperá un momento');
           const input = joinRoomSchema.parse(payload);
-          const { room, seat } = rooms.joinRoom(input.roomId, input.nickname, socket.id, now());
-          this.bind(socket, room.id, seat.playerId, seat.playerToken);
-
+          const { room, seat } = rooms.joinRoom(
+            input.roomId,
+            input.nickname,
+            ctx.connectionId,
+            now(),
+          );
+          this.bind(ctx, room.id, seat.playerId, seat.playerToken);
           logger.info({ roomId: room.id, playerId: seat.playerId }, 'jugador se unio');
-          ack({
+
+          const ack: Ack<Record<string, unknown>> = {
             ok: true,
             playerToken: seat.playerToken,
             playerId: seat.playerId,
             roomId: room.id,
             room: rooms.redactRoom(room),
-          });
+          };
           this.broadcastRoom(room);
-        } catch (error) {
-          ack(fail(error));
+          return ack;
         }
-      });
 
-      socket.on('session:resume', (payload, ack) => {
-        try {
+        case 'session:resume': {
           const input = resumeSessionSchema.parse(payload);
           const { room, seat, displacedSocketId } = rooms.resumeSession(
             input.roomId,
             input.playerToken,
-            socket.id,
+            ctx.connectionId,
             now(),
           );
 
           if (displacedSocketId) {
-            io.to(displacedSocketId).emit('error:game', {
+            // Dos pestañas con el mismo token generarian comandos duplicados.
+            this.deps.emitter.push(displacedSocketId, 'error:game', {
               code: 'SESSION_TAKEN_OVER',
               message: 'Abriste la partida en otra pestaña',
             });
           }
 
-          this.bind(socket, room.id, seat.playerId, seat.playerToken);
+          this.bind(ctx, room.id, seat.playerId, seat.playerToken);
           logger.info({ roomId: room.id, playerId: seat.playerId }, 'sesion reanudada');
 
-          ack({
+          const ack: Ack<Record<string, unknown>> = {
             ok: true,
             playerId: seat.playerId,
             room: rooms.redactRoom(room),
             // Estado COMPLETO: no intentamos reproducir el diff que se perdio.
             state: rooms.viewFor(room, seat.playerId),
-          });
+          };
           this.broadcastRoom(room);
           if (room.game) this.broadcastState(room);
-        } catch (error) {
-          ack(fail(error));
+          return ack;
         }
-      });
 
-      socket.on('game:start', (payload, ack) => {
-        try {
+        case 'game:start': {
           const input = startGameSchema.parse(payload ?? {});
-          const { playerId, roomId } = socket.data;
+          const { playerId, roomId } = ctx;
           if (!playerId || !roomId) throw new GameError('PLAYER_NOT_FOUND', 'No estas en una sala');
 
           const { room, events } = rooms.startGame(roomId, playerId, now(), compact(input.options));
@@ -278,110 +262,115 @@ export class Gateway {
             { roomId: room.id, seed: room.game?.seed, players: room.seats.length },
             'partida iniciada',
           );
-          ack({ ok: true });
           this.broadcastRoom(room);
           this.broadcastState(room, events);
-        } catch (error) {
-          ack(fail(error));
+          return { ok: true };
         }
-      });
 
-      socket.on('game:command', (payload, ack) => {
-        let clientSeq = 0;
-        try {
-          if (!this.limiter.allow(socket.id, now())) {
-            throw Object.assign(new Error('Demasiados comandos'), { code: 'RATE_LIMITED' });
-          }
-
+        case 'game:command': {
+          this.requireQuota(this.limiter, ctx, 'Demasiados comandos');
           const input = commandEnvelopeSchema.parse(payload);
-          clientSeq = input.clientSeq;
-          const { playerId, roomId } = socket.data;
+          const { playerId, roomId } = ctx;
           if (!playerId || !roomId) throw new GameError('PLAYER_NOT_FOUND', 'No estas en una sala');
 
-          // El playerId sale del socket autenticado, NUNCA del payload.
-          const result = rooms.applyCommand(roomId, playerId, input.command, now(), {
-            clientSeq: input.clientSeq,
-            ...(input.expectedVersion !== undefined
-              ? { expectedVersion: input.expectedVersion }
-              : {}),
-          });
+          try {
+            // El playerId sale del contexto de la conexion, NUNCA del payload.
+            const result = rooms.applyCommand(roomId, playerId, input.command, now(), {
+              clientSeq: input.clientSeq,
+              ...(input.expectedVersion !== undefined
+                ? { expectedVersion: input.expectedVersion }
+                : {}),
+            });
 
-          ack({ ok: true, version: result.version, clientSeq: input.clientSeq });
+            const room = rooms.find(roomId);
+            if (room) {
+              for (const effect of result.effects) {
+                if (effect.kind === 'state:patch') this.broadcastState(room, effect.events);
+              }
+            }
+            return { ok: true, version: result.version, clientSeq: input.clientSeq };
+          } catch (error) {
+            const room = rooms.find(roomId);
+            const version = room?.game?.version;
 
-          const room = rooms.find(roomId);
-          if (!room) return;
-          for (const effect of result.effects) {
-            if (effect.kind === 'state:patch') this.broadcastState(room, effect.events);
-          }
-        } catch (error) {
-          const room = socket.data.roomId ? rooms.find(socket.data.roomId) : undefined;
-          const version = room?.game?.version;
-
-          // El ack va SOLO al emisor: los otros 9 no tienen por que enterarse de
-          // un intento ilegal, y contarselo revelaria que tiene esa carta.
-          ack(fail(error, { clientSeq, ...(version !== undefined ? { version } : {}) }));
-
-          const { code } = toErrorCode(error);
-          if (code === 'STALE_COMMAND' && room && socket.data.playerId) {
-            this.syncOne(room, socket.data.playerId, socket.id);
+            // Si el comando venia de un estado viejo, le reenviamos el actual.
+            if (toErrorCode(error).code === 'STALE_COMMAND' && room && ctx.playerId) {
+              this.syncOne(room, ctx.playerId, ctx.connectionId);
+            }
+            // El ack va SOLO al emisor: los otros 9 no tienen por que enterarse
+            // de un intento ilegal, y contarselo revelaria que tiene esa carta.
+            return fail(error, {
+              clientSeq: input.clientSeq,
+              ...(version !== undefined ? { version } : {}),
+            });
           }
         }
-      });
 
-      socket.on('game:nextRound', (ack) => {
-        try {
-          const { playerId, roomId } = socket.data;
+        case 'game:nextRound': {
+          const { playerId, roomId } = ctx;
           if (!playerId || !roomId) throw new GameError('PLAYER_NOT_FOUND', 'No estas en una sala');
           const result = rooms.nextRound(roomId, playerId, now());
-          ack({ ok: true });
 
           const room = rooms.find(roomId);
-          if (!room) return;
-          for (const effect of result.effects) {
-            if (effect.kind === 'state:patch') this.broadcastState(room, effect.events);
+          if (room) {
+            for (const effect of result.effects) {
+              if (effect.kind === 'state:patch') this.broadcastState(room, effect.events);
+            }
           }
-        } catch (error) {
-          ack(fail(error));
+          return { ok: true };
         }
-      });
 
-      socket.on('room:leave', (ack) => {
-        try {
-          const result = rooms.handleDisconnect(socket.id, now());
-          this.bind(socket, null, null, null);
-          ack({ ok: true });
+        case 'room:leave': {
+          const result = rooms.handleDisconnect(ctx.connectionId, now());
+          this.bind(ctx, null, null, null);
           if (result) {
             this.broadcastRoom(result.room);
             if (result.room.game) this.broadcastState(result.room);
           }
-        } catch (error) {
-          ack(fail(error));
+          return { ok: true };
         }
-      });
 
-      socket.on('disconnect', (reason) => {
-        this.limiter.forget(socket.id);
-        this.joinLimiter.forget(socket.id);
-        const result = rooms.handleDisconnect(socket.id, now());
-        if (!result) return;
+        default:
+          return fail(
+            Object.assign(new Error(`Evento desconocido: ${event}`), {
+              code: 'INVALID_PAYLOAD',
+            }),
+          );
+      }
+    } catch (error) {
+      return fail(error);
+    }
+  }
 
-        logger.info({ roomId: result.room.id, playerId: result.playerId, reason }, 'desconexion');
-        this.broadcastRoom(result.room);
-        // El timer del turno NO se pausa aca a proposito.
-        if (result.room.game) this.broadcastState(result.room);
-      });
-    });
+  /** Desconexion de una conexion. La dispara el transporte, no el cliente. */
+  handleDisconnect(ctx: ConnectionContext, reason: string): void {
+    const { rooms, logger, now } = this.deps;
+    this.limiter.forget(ctx.connectionId);
+    this.joinLimiter.forget(ctx.connectionId);
+
+    const result = rooms.handleDisconnect(ctx.connectionId, now());
+    if (!result) return;
+
+    logger.info({ roomId: result.room.id, playerId: result.playerId, reason }, 'desconexion');
+    this.broadcastRoom(result.room);
+    // El timer del turno NO se pausa aca a proposito.
+    if (result.room.game) this.broadcastState(result.room);
+  }
+
+  private requireQuota(limiter: RateLimiter, ctx: ConnectionContext, message: string): void {
+    if (!limiter.allow(ctx.connectionId, this.deps.now())) {
+      throw Object.assign(new Error(message), { code: 'RATE_LIMITED' });
+    }
   }
 
   private bind(
-    socket: UnoSocket,
+    ctx: ConnectionContext,
     roomId: string | null,
     playerId: string | null,
     playerToken: string | null,
   ): void {
-    socket.data.roomId = roomId;
-    socket.data.playerId = playerId;
-    socket.data.playerToken = playerToken;
-    if (roomId) void socket.join(roomId);
+    ctx.roomId = roomId;
+    ctx.playerId = playerId;
+    ctx.playerToken = playerToken;
   }
 }

@@ -112,6 +112,21 @@ importers:
         specifier: ^6.0.5
         version: 6.4.3(@types/node@22.20.3)(jiti@1.21.7)(tsx@4.23.13)
 
+  packages/core:
+    dependencies:
+      '@uno/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@uno/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      nanoid:
+        specifier: ^5.0.9
+        version: 5.1.16
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+
   packages/engine:
     dependencies:
       nanoid:
@@ -139,6 +154,9 @@ importers:
 
   packages/server:
     dependencies:
+      '@uno/core':
+        specifier: workspace:*
+        version: link:../core
       '@uno/engine':
         specifier: workspace:*
         version: link:../engine

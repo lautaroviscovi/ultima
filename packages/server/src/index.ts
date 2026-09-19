@@ -1,12 +1,12 @@
 import { createApp } from './app.js';
-import { ConfigError, loadConfig, type ServerConfig } from './config.js';
+import { ConfigError, loadConfig, type ServerConfig } from '@uno/core';
 import { createLogger } from './logger.js';
 
 const logger = createLogger();
 
 let config: ServerConfig;
 try {
-  config = loadConfig();
+  config = loadConfig(process.env);
 } catch (error) {
   // Fallar al arrancar con un mensaje claro es mucho mejor que fallar en la
   // primera conexion con un error de CORS que desde el navegador se ve como

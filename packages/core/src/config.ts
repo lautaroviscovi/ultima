@@ -14,13 +14,10 @@ export interface ServerConfig {
 
 export class ConfigError extends Error {}
 
-function int(
-  env: NodeJS.ProcessEnv,
-  name: string,
-  fallback: number,
-  min: number,
-  max: number,
-): number {
+/** Fuente de variables. En Node es `process.env`; en un Worker, el `env` del fetch. */
+export type EnvSource = Record<string, string | undefined>;
+
+function int(env: EnvSource, name: string, fallback: number, min: number, max: number): number {
   const raw = env[name];
   if (raw === undefined || raw === '') return fallback;
   const value = Number(raw);
@@ -40,7 +37,7 @@ function int(
  * en CLIENT_ORIGIN da un error de CORS que desde el navegador se ve como
  * "no conecta" y cuesta media hora encontrar.
  */
-export function loadConfig(env = process.env): ServerConfig {
+export function loadConfig(env: EnvSource): ServerConfig {
   const isProduction = env['NODE_ENV'] === 'production';
 
   const raw = env['CLIENT_ORIGIN'] ?? (isProduction ? '' : 'http://localhost:5173');

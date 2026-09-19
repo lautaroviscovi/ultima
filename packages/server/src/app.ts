@@ -2,10 +2,8 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import express from 'express';
 import { Server } from 'socket.io';
 import { DEFAULT_OPTIONS, type GameOptions } from '@uno/engine';
-import { Gateway, type UnoServer } from './gateway.js';
-import { RoomManager } from './RoomManager.js';
-import { TurnScheduler } from './TurnScheduler.js';
-import { silentLogger, type Logger } from './logger.js';
+import { Gateway, RoomManager, TurnScheduler, silentLogger, type Logger } from '@uno/core';
+import { registerSocketIO, SocketIOEmitter, type UnoServer } from './socketio.js';
 
 export interface AppConfig {
   clientOrigins: string[];
@@ -79,8 +77,14 @@ export function createApp(overrides: Partial<AppConfig> = {}): UnoApp {
   });
 
   const scheduler = new TurnScheduler((roomId) => gateway.handleTurnExpired(roomId));
-  const gateway = new Gateway({ io, rooms, scheduler, logger: config.logger, now: config.now });
-  gateway.register();
+  const gateway = new Gateway({
+    emitter: new SocketIOEmitter(io),
+    rooms,
+    scheduler,
+    logger: config.logger,
+    now: config.now,
+  });
+  registerSocketIO(io, gateway);
 
   // Barrido de abandonos y salas vencidas.
   const sweepTimer = setInterval(() => {

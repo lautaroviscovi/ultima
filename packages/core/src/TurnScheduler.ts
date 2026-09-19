@@ -7,8 +7,15 @@
  *
  * Aislado del RoomManager para poder testear con fake timers sin arrastrar
  * toda la logica de salas.
+ *
+ * Esta es la implementacion para Node. Un Durable Object necesita la Alarms
+ * API en su lugar: un setTimeout muere cuando el objeto hiberna, y hibernar es
+ * justo lo que pasa cuando un jugador NO juega — el caso que este timer existe
+ * para resolver.
  */
-export class TurnScheduler {
+import type { Scheduler } from './ports.js';
+
+export class TurnScheduler implements Scheduler {
   private readonly timers = new Map<string, NodeJS.Timeout>();
 
   constructor(private readonly onExpire: (roomId: string) => void) {}

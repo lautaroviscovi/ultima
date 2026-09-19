@@ -1,10 +1,8 @@
 import pino from 'pino';
 
-export interface Logger {
-  info(obj: object, msg?: string): void;
-  warn(obj: object, msg?: string): void;
-  error(obj: object, msg?: string): void;
-}
+import type { Logger } from '@uno/core';
+
+export type { Logger };
 
 /**
  * Siempre con roomId y seed en el contexto: es lo que convierte un bug
@@ -22,9 +20,4 @@ export function createLogger(level = process.env['LOG_LEVEL'] ?? 'info'): Logger
   });
 }
 
-/** Logger mudo para los tests. */
-export const silentLogger: Logger = {
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-};
+export { silentLogger } from '@uno/core';

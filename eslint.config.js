@@ -37,6 +37,33 @@ export default tseslint.config(
     },
   },
 
+  // @uno/core tiene que correr igual en Node y en un Durable Object, asi que
+  // no puede importar NADA especifico de una plataforma. Mismo patron que la
+  // regla de pureza del engine: hacer la disciplina mecanica en vez de
+  // depender de que alguien se acuerde.
+  {
+    files: ['packages/core/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['node:*', 'express', 'socket.io', 'pino', 'http', 'fs', 'path'],
+              message:
+                '@uno/core debe correr en Node Y en Workers: lo especifico de plataforma entra por los puertos (Emitter, Logger, Scheduler).',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'process', message: 'La config entra por parametro, no por process.env.' },
+        { name: '__dirname', message: 'No existe en Workers.' },
+      ],
+    },
+  },
+
   // El engine es una funcion pura. Esta regla hace la pureza MECANICA en vez de
   // depender de disciplina: sin determinismo no hay replay, no hay tests
   // reproducibles, y los escenarios de borde (wild4 inicial) se vuelven
