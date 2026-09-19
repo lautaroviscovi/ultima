@@ -2,8 +2,16 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import express from 'express';
 import { Server } from 'socket.io';
 import { DEFAULT_OPTIONS, type GameOptions } from '@uno/engine';
-import { Gateway, RoomManager, TurnScheduler, silentLogger, type Logger } from '@uno/core';
+import {
+  CompositeEmitter,
+  Gateway,
+  RoomManager,
+  TurnScheduler,
+  silentLogger,
+  type Logger,
+} from '@uno/core';
 import { registerSocketIO, SocketIOEmitter, type UnoServer } from './socketio.js';
+import { registerWsTransport, WsEmitter } from './wsTransport.js';
 
 export interface AppConfig {
   clientOrigins: string[];
@@ -76,15 +84,29 @@ export function createApp(overrides: Partial<AppConfig> = {}): UnoApp {
     options: config.options,
   });
 
+  /**
+   * Los dos transportes comparten el MISMO RoomManager y el MISMO Gateway.
+   *
+   * El composite rutea cada push al transporte dueño de la conexion, asi que
+   * dos jugadores en la misma sala por transportes distintos se ven entre si.
+   * Sin esto haria falta un Gateway por transporte, con salas separadas.
+   */
+  const socketIoEmitter = new SocketIOEmitter(io);
+  const wsEmitter = new WsEmitter();
+  const emitter = new CompositeEmitter();
+  emitter.register(socketIoEmitter);
+  emitter.register(wsEmitter);
+
   const scheduler = new TurnScheduler((roomId) => gateway.handleTurnExpired(roomId));
   const gateway = new Gateway({
-    emitter: new SocketIOEmitter(io),
+    emitter,
     rooms,
     scheduler,
     logger: config.logger,
     now: config.now,
   });
-  registerSocketIO(io, gateway);
+  registerSocketIO(io, gateway, socketIoEmitter);
+  registerWsTransport({ httpServer, gateway, emitter: wsEmitter, logger: config.logger });
 
   // Barrido de abandonos y salas vencidas.
   const sweepTimer = setInterval(() => {

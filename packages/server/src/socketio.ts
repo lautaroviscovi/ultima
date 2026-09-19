@@ -5,7 +5,7 @@ import type {
   ServerToClientEvents,
   SocketData,
 } from '@uno/protocol';
-import type { ConnectionContext, Emitter, Gateway, PushPayload } from '@uno/core';
+import type { ConnectionContext, Gateway, OwnedEmitter, PushPayload } from '@uno/core';
 
 export type UnoServer = Server<
   ClientToServerEvents,
@@ -27,8 +27,22 @@ export type UnoSocket = Socket<
  * es lo unico que los conecta — y su equivalente para el Worker sera un
  * `WsEmitter` que hace `ws.send(JSON.stringify(...))`.
  */
-export class SocketIOEmitter implements Emitter {
+export class SocketIOEmitter implements OwnedEmitter {
+  private readonly ids = new Set<string>();
+
   constructor(private readonly io: UnoServer) {}
+
+  owns(connectionId: string): boolean {
+    return this.ids.has(connectionId);
+  }
+
+  add(connectionId: string): void {
+    this.ids.add(connectionId);
+  }
+
+  remove(connectionId: string): void {
+    this.ids.delete(connectionId);
+  }
 
   push<E extends keyof ServerToClientEvents>(
     connectionId: string,
@@ -59,8 +73,9 @@ const CLIENT_EVENTS = [
  * Antes cada handler tenia su logica adentro; ahora son todos la misma linea.
  * Esa uniformidad es la prueba de que la logica quedo del lado agnostico.
  */
-export function registerSocketIO(io: UnoServer, gateway: Gateway): void {
+export function registerSocketIO(io: UnoServer, gateway: Gateway, emitter: SocketIOEmitter): void {
   io.on('connection', (socket: UnoSocket) => {
+    emitter.add(socket.id);
     const ctx: ConnectionContext = {
       connectionId: socket.id,
       playerId: null,
@@ -78,6 +93,9 @@ export function registerSocketIO(io: UnoServer, gateway: Gateway): void {
       });
     }
 
-    socket.on('disconnect', (reason) => gateway.handleDisconnect(ctx, reason));
+    socket.on('disconnect', (reason) => {
+      emitter.remove(socket.id);
+      gateway.handleDisconnect(ctx, reason);
+    });
   });
 }

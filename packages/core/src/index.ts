@@ -1,4 +1,5 @@
 export * from './ports.js';
+export * from './CompositeEmitter.js';
 export * from './RoomManager.js';
 export * from './TurnScheduler.js';
 export * from './gateway.js';

@@ -1,4 +1,3 @@
-import { io as connect, type Socket } from 'socket.io-client';
 import type {
   Ack,
   ClientToServerEvents,
@@ -7,11 +6,9 @@ import type {
   PlayerCommand,
   RedactedRoomState,
   ResumeResult,
-  ServerToClientEvents,
 } from '@uno/protocol';
 import type { GameEvent, RedactedGameState } from '@uno/engine';
-
-type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+import { createTransport, type TestTransport, type TransportKind } from './transport.js';
 
 /**
  * Cliente de prueba: un socket real contra un servidor real en un puerto
@@ -19,7 +16,7 @@ type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
  * de probar justamente lo fragil (handshake, acks, reconexion).
  */
 export class TestClient {
-  private socket: ClientSocket;
+  private transport: TestTransport;
   private seq = 0;
 
   playerId: string | null = null;
@@ -33,51 +30,46 @@ export class TestClient {
   /** Todo lo recibido, para auditar filtraciones. */
   readonly received: unknown[] = [];
 
-  constructor(private readonly url: string) {
-    this.socket = this.makeSocket();
+  constructor(
+    private readonly url: string,
+    private readonly kind: TransportKind = 'socketio',
+  ) {
+    this.transport = createTransport(kind, url);
   }
 
-  private makeSocket(): ClientSocket {
-    const socket: ClientSocket = connect(this.url, {
-      transports: ['websocket'],
-      autoConnect: true,
-      reconnection: false,
-    });
-
-    socket.on('state:sync', (state) => {
-      this.state = state;
-      this.received.push(state);
-    });
-    socket.on('state:patch', (payload) => {
-      this.state = payload.state;
-      this.events.push(...payload.events);
-      this.received.push(payload);
-    });
-    socket.on('room:updated', (room) => {
-      this.room = room;
-      this.received.push(room);
-    });
-    socket.on('error:game', (error) => {
-      this.errors.push(error);
-    });
-
-    return socket;
-  }
-
-  get id(): string {
-    return this.socket.id ?? '';
-  }
+  /** Los pushes del servidor, sin importar el transporte. */
+  private handlePush = (event: string, data: unknown): void => {
+    switch (event) {
+      case 'state:sync':
+        this.state = data as RedactedGameState;
+        this.received.push(data);
+        break;
+      case 'state:patch': {
+        const patch = data as { state: RedactedGameState; events: GameEvent[] };
+        this.state = patch.state;
+        this.events.push(...patch.events);
+        this.received.push(data);
+        break;
+      }
+      case 'room:updated':
+        this.room = data as RedactedRoomState;
+        this.received.push(data);
+        break;
+      case 'error:game':
+        this.errors.push(data as { code: string; message: string });
+        break;
+      default:
+        break;
+    }
+  };
 
   get connected(): boolean {
-    return this.socket.connected;
+    return this.transport.connected;
   }
 
   async waitConnected(): Promise<void> {
-    if (this.socket.connected) return;
-    await new Promise<void>((resolve, reject) => {
-      this.socket.once('connect', () => resolve());
-      this.socket.once('connect_error', reject);
-    });
+    if (this.transport.connected) return;
+    await this.transport.connect({ onPush: this.handlePush });
   }
 
   async createRoom(nickname: string, options?: object): Promise<Ack<JoinResult>> {
@@ -133,22 +125,20 @@ export class TestClient {
     return this.emit<Ack<{ version: number; clientSeq: number }>>('game:command', payload);
   }
 
-  /** Corta el socket de golpe, como una caida de red. */
+  /** Corta la conexion de golpe, como una caida de red. */
   hardDisconnect(): void {
-    this.socket.disconnect();
+    this.transport.hardDisconnect();
   }
 
-  /** Vuelve con un socket nuevo, como haria el cliente real tras reconectar. */
+  /** Vuelve con una conexion nueva, como haria el cliente real. */
   async reconnect(): Promise<void> {
-    this.socket.removeAllListeners();
-    this.socket.disconnect();
-    this.socket = this.makeSocket();
-    await this.waitConnected();
+    this.transport.close();
+    this.transport = createTransport(this.kind, this.url);
+    await this.transport.connect({ onPush: this.handlePush });
   }
 
   close(): void {
-    this.socket.removeAllListeners();
-    this.socket.disconnect();
+    this.transport.close();
   }
 
   /** Espera a que se cumpla una condicion, con timeout claro. */
@@ -172,9 +162,7 @@ export class TestClient {
    * Emite y espera el ack. El tipo de retorno lo fijan los helpers publicos de
    * arriba, que son los que conocen la forma de cada ack.
    */
-  private emit<T>(event: keyof ClientToServerEvents, ...args: unknown[]): Promise<T> {
-    return new Promise<T>((resolve) => {
-      (this.socket.emit as (e: string, ...rest: unknown[]) => void)(event, ...args, resolve);
-    });
+  private emit<T>(event: keyof ClientToServerEvents, payload?: unknown): Promise<T> {
+    return this.transport.request<T>(event, payload);
   }
 }
