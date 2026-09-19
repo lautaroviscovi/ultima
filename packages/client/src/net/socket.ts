@@ -1,63 +1,238 @@
-import { io, type Socket } from 'socket.io-client';
-import type { ClientToServerEvents, ServerToClientEvents } from '@uno/protocol';
+import {
+  MAX_MESSAGE_BYTES,
+  type ClientToServerEvents,
+  type PushEnvelope,
+  type ReqEnvelope,
+  type ServerEnvelope,
+  type ServerToClientEvents,
+} from '@uno/protocol';
 import { useGameStore } from '../stores/game.js';
-
-export type ClientSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 const SERVER_URL = import.meta.env['VITE_SERVER_URL'] ?? 'http://localhost:3000';
 
+/** Un request sin respuesta cuelga la promesa para siempre si no hay timeout. */
+const REQUEST_TIMEOUT_MS = 10_000;
+const MAX_BACKOFF_MS = 30_000;
+
+/** Handler de un push del servidor. */
+export type PushHandler = (event: keyof ServerToClientEvents, data: unknown) => void;
+
+interface Pending {
+  resolve: (value: never) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 /**
- * Singleton a nivel de modulo, NO un hook.
+ * Transporte WebSocket nativo, singleton a nivel de modulo.
  *
- * Un useSocket() que abriera la conexion se montaria y desmontaria con el arbol
- * de React: pelea con StrictMode (doble efecto en dev) y termina abriendo dos
- * sockets. El socket es un singleton de aplicacion, no parte del ciclo de vida
- * de un componente.
+ * NO es un hook: un `useSocket()` que abriera la conexion se montaria y
+ * desmontaria con el arbol de React, pelearia con StrictMode y terminaria
+ * abriendo dos sockets. El socket es un singleton de aplicacion.
  *
- * Tampoco va como middleware de Zustand: el middleware es para transformar
- * set/get, no para I/O.
+ * Reemplaza a socket.io-client, que daba gratis los acks y la reconexion. Los
+ * acks se correlacionan con el `id` del envelope; la reconexion esta abajo.
  */
-let socket: ClientSocket | null = null;
+class UnoSocket {
+  private ws: WebSocket | null = null;
+  private nextId = 0;
+  private readonly pending = new Map<number, Pending>();
+  private pushHandler: PushHandler | null = null;
 
-export function getSocket(): ClientSocket {
-  if (socket) return socket;
+  /**
+   * Requests emitidos antes de que el socket abriera.
+   *
+   * Socket.IO bufferea los emits hasta conectar; sobre WS nativo hay que
+   * hacerlo a mano. Sin esto, el primer `createRoom` tras cargar la pagina
+   * falla con "sin conexion" porque el socket todavia esta en CONNECTING.
+   */
+  private readonly queued: Array<() => void> = [];
 
-  socket = io(SERVER_URL, {
-    autoConnect: false,
-    // Dejamos el backoff exponencial por defecto de Socket.IO.
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-  });
+  private attempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private intentionallyClosed = false;
+  /** Se dispara al (re)abrir: es donde el cliente reclama su asiento. */
+  private onOpenHook: (() => void) | null = null;
 
-  const store = useGameStore.getState();
+  get connected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
 
-  socket.on('connect', () => store.setConnection('connected'));
-  socket.on('disconnect', () => store.setConnection('disconnected'));
-  socket.io.on('reconnect_attempt', () => store.setConnection('reconnecting'));
-  socket.on('connect_error', () => store.setConnection('disconnected'));
+  setPushHandler(handler: PushHandler): void {
+    this.pushHandler = handler;
+  }
 
+  setOnOpen(hook: () => void): void {
+    this.onOpenHook = hook;
+  }
+
+  connect(): void {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+    this.intentionallyClosed = false;
+    this.open();
+  }
+
+  private open(): void {
+    const store = useGameStore.getState();
+    store.setConnection(this.attempts === 0 ? 'connecting' : 'reconnecting');
+
+    const url = SERVER_URL.replace(/^http/, 'ws') + '/ws';
+    const ws = new WebSocket(url);
+    this.ws = ws;
+
+    ws.onopen = () => {
+      this.attempts = 0;
+      useGameStore.getState().setConnection('connected');
+
+      // Primero el hook (reclama el asiento), despues lo que estaba encolado.
+      this.onOpenHook?.();
+      const queued = this.queued.splice(0);
+      for (const send of queued) send();
+    };
+
+    ws.onmessage = (event) => {
+      if (typeof event.data !== 'string' || event.data.length > MAX_MESSAGE_BYTES) return;
+      let envelope: ServerEnvelope;
+      try {
+        envelope = JSON.parse(event.data) as ServerEnvelope;
+      } catch {
+        return;
+      }
+
+      if (envelope.t === 'res') {
+        const pending = this.pending.get(envelope.id);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        this.pending.delete(envelope.id);
+        pending.resolve(envelope.d as never);
+        return;
+      }
+
+      const push = envelope as PushEnvelope;
+      this.pushHandler?.(push.ev, push.d);
+    };
+
+    ws.onclose = (event) => {
+      this.failPending('conexión cerrada');
+      useGameStore.getState().setConnection('disconnected');
+
+      // 1008 es violacion de protocolo y SESSION_TAKEN_OVER es terminal:
+      // reintentar seria un bucle.
+      if (this.intentionallyClosed || event.code === 1008) return;
+      this.scheduleReconnect();
+    };
+
+    ws.onerror = () => {
+      // El close que sigue se encarga de reprogramar.
+    };
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) return;
+
+    /**
+     * Backoff exponencial CON jitter. El jitter no es cosmetico: sin el, un
+     * redeploy hace que todas las pestañas reconecten en el mismo milisegundo.
+     */
+    const base = Math.min(1000 * 2 ** this.attempts, MAX_BACKOFF_MS);
+    const delay = base * (0.5 + Math.random() * 0.5);
+    this.attempts++;
+
+    useGameStore.getState().setConnection('reconnecting');
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      // Si la pestaña esta oculta, diferimos: ahorra requests en pestañas
+      // olvidadas, que es un caso real.
+      if (typeof document !== 'undefined' && document.hidden) {
+        this.scheduleReconnect();
+        return;
+      }
+      this.open();
+    }, delay);
+  }
+
+  /** Emite y espera el ack correlacionado por id. */
+  request<T>(event: keyof ClientToServerEvents, payload?: unknown): Promise<T> {
+    const connecting = this.ws?.readyState === WebSocket.CONNECTING;
+    if (!this.ws || (!this.connected && !connecting)) {
+      return Promise.resolve(this.offline<T>());
+    }
+
+    const id = ++this.nextId;
+    const envelope: ReqEnvelope = {
+      t: 'req',
+      id,
+      ev: event,
+      ...(payload === undefined ? {} : { d: payload }),
+    };
+
+    return new Promise<T>((resolve) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        // RESOLVE, no reject: todo commands.ts asume que el ack siempre llega
+        // y hace `if (!res.ok)`. Rechazar reventaria sendCommand sin desmarcar
+        // cardsInFlight, y la carta quedaria invisible.
+        resolve(this.offline<T>('el servidor no respondió'));
+      }, REQUEST_TIMEOUT_MS);
+
+      this.pending.set(id, { resolve: resolve as (v: never) => void, timer });
+
+      const send = (): void => {
+        if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(envelope));
+      };
+      // Si todavia no abrio, se encola: el timeout sigue corriendo igual, asi
+      // que un socket que nunca abre no deja la promesa colgada.
+      if (connecting) this.queued.push(send);
+      else send();
+    });
+  }
+
+  disconnect(): void {
+    this.intentionallyClosed = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.ws?.close();
+    this.ws = null;
+    this.failPending('desconectado');
+  }
+
+  private failPending(message: string): void {
+    for (const { resolve, timer } of this.pending.values()) {
+      clearTimeout(timer);
+      (resolve as (v: unknown) => void)(this.offline(message));
+    }
+    this.pending.clear();
+  }
+
+  private offline<T>(message = 'sin conexión'): T {
+    return { ok: false, code: 'INTERNAL_ERROR', message } as T;
+  }
+}
+
+const socket = new UnoSocket();
+
+export function getSocket(): UnoSocket {
   return socket;
 }
 
-export function connect(): ClientSocket {
-  const s = getSocket();
-  if (!s.connected) {
-    useGameStore.getState().setConnection('connecting');
-    s.connect();
-  }
-  return s;
+export function connect(): UnoSocket {
+  socket.connect();
+  return socket;
 }
 
 export function disconnect(): void {
-  socket?.disconnect();
+  socket.disconnect();
 }
 
 /** Emite y espera el ack. Toda la comunicacion pasa por aca. */
 export function emitWithAck<T>(event: keyof ClientToServerEvents, ...args: unknown[]): Promise<T> {
-  const s = getSocket();
-  return new Promise<T>((resolve) => {
-    (s.emit as (e: string, ...rest: unknown[]) => void)(event, ...args, resolve);
-  });
+  return socket.request<T>(event, args[0]);
 }
 
 export const serverUrl = SERVER_URL;

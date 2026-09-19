@@ -1,4 +1,5 @@
-import type { RedactedGameState } from '@uno/engine';
+import type { GameEvent, RedactedGameState } from '@uno/engine';
+import type { ProtocolErrorCode, RedactedRoomState, ServerToClientEvents } from '@uno/protocol';
 import { useGameStore } from '../stores/game.js';
 import { useUIStore } from '../stores/ui.js';
 import { getSocket } from './socket.js';
@@ -22,9 +23,9 @@ function syncInFlight(state: RedactedGameState): void {
 }
 
 /**
- * Registra los handlers del servidor. Lo UNICO que hacen es llamar acciones
- * del store: cero logica. Si aparece una decision de juego aca, esta en el
- * lugar equivocado — pertenece al engine, que es autoritativo en el servidor.
+ * Enruta los pushes del servidor al store. Lo UNICO que hacen es llamar
+ * acciones: cero logica. Si aparece una decision de juego aca, esta en el lugar
+ * equivocado — pertenece al engine, que es autoritativo en el servidor.
  */
 let registered = false;
 
@@ -32,57 +33,43 @@ export function registerListeners(): void {
   if (registered) return;
   registered = true;
 
-  const socket = getSocket();
   const store = useGameStore.getState();
 
-  /**
-   * Desregistramos antes de registrar.
-   *
-   * El socket es un singleton de modulo, pero en dev Vite reemplaza este
-   * modulo en caliente: los handlers viejos siguen colgados del MISMO socket y
-   * apuntan a funciones que ya no existen. El sintoma es un
-   * "X is not defined" en cada patch, con el codigo fuente correcto.
-   *
-   * En produccion esto no pasa, pero limpiar es correcto igual: registrar dos
-   * veces duplicaria cada evento.
-   */
-  for (const event of [
-    'state:sync',
-    'state:patch',
-    'room:updated',
-    'error:game',
-    'server:shutdown',
-  ] as const) {
-    socket.off(event);
-  }
-
-  socket.on('state:sync', (state) => {
-    store.applySync(state);
-    syncInFlight(state);
-  });
-
-  socket.on('state:patch', ({ state, events }) => {
-    store.applyPatch(state, events);
-    syncInFlight(state);
-  });
-
-  socket.on('room:updated', (room) => {
-    store.applyRoom(room);
-  });
-
-  socket.on('error:game', (error) => {
-    store.setError(error);
-  });
-
-  socket.on('server:shutdown', ({ message }) => {
-    // Las salas viven en memoria: un redeploy mata las partidas en curso.
-    store.setError({ code: 'INTERNAL_ERROR', message });
+  getSocket().setPushHandler((event: keyof ServerToClientEvents, data: unknown) => {
+    switch (event) {
+      case 'state:sync': {
+        const state = data as RedactedGameState;
+        store.applySync(state);
+        syncInFlight(state);
+        break;
+      }
+      case 'state:patch': {
+        const patch = data as { state: RedactedGameState; events: GameEvent[] };
+        store.applyPatch(patch.state, patch.events);
+        syncInFlight(patch.state);
+        break;
+      }
+      case 'room:updated':
+        store.applyRoom(data as RedactedRoomState);
+        break;
+      case 'error:game':
+        store.setError(data as { code: ProtocolErrorCode; message: string });
+        break;
+      case 'server:shutdown': {
+        // Las salas viven en memoria: un redeploy mata las partidas en curso.
+        const { message } = data as { message: string };
+        store.setError({ code: 'INTERNAL_ERROR', message });
+        break;
+      }
+      default:
+        break;
+    }
   });
 }
 
 // En dev, al reemplazarse este modulo el flag vuelve a false en la copia nueva
-// pero los handlers viejos siguen vivos. Lo marcamos explicitamente para que
-// la copia nueva sepa que tiene que re-registrar (y limpiar) de verdad.
+// pero el handler viejo sigue instalado en el socket singleton. Lo marcamos
+// para que la copia nueva re-registre de verdad.
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     registered = false;
