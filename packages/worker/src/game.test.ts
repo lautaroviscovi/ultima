@@ -125,11 +125,23 @@ describe('partida contra el Durable Object', () => {
     // Manos distintas.
     expect([...hostIds].some((id) => guestIds.has(id))).toBe(false);
 
-    // Ninguno ve la carta del otro en NADA de lo que recibio.
-    const payload = JSON.stringify(host.received);
+    /**
+     * Ninguno ve la carta del otro en NADA de lo que recibio.
+     *
+     * Se comparan ids COMPLETOS, no substrings: con `toContain`, buscar
+     * "r0c3" da falso positivo contra "r0c36", que puede ser una carta propia.
+     * Ese error hacia fallar el test ~1 de cada 3 corridas sin que hubiera
+     * filtracion real.
+     */
+    const seenIds = new Set(
+      (JSON.stringify(host.received).match(/"id":"(r\d+c\d+)"/g) ?? []).map((m) =>
+        m.slice('"id":"'.length, -1),
+      ),
+    );
+    const discardId = host.state!.discardTop?.id;
     for (const id of guestIds) {
-      const isDiscard = host.state!.discardTop?.id === id;
-      if (!isDiscard) expect(payload).not.toContain(id);
+      if (id === discardId) continue;
+      expect(seenIds.has(id), `el host vio la carta ajena ${id}`).toBe(false);
     }
 
     // Del ajeno solo se ve el conteo.

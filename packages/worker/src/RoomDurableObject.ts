@@ -18,6 +18,7 @@ import {
   type ResEnvelope,
   type ServerToClientEvents,
 } from '@uno/protocol';
+import { clearSnapshot, restoreSnapshot, saveSnapshot } from './snapshot.js';
 
 /** Cierre por violacion de protocolo. */
 const CLOSE_POLICY = 1008;
@@ -25,6 +26,17 @@ const CLOSE_POLICY = 1008;
 export interface Env {
   ROOM: DurableObjectNamespace<RoomDurableObject>;
   CLIENT_ORIGIN?: string;
+  TURN_TIMEOUT_MS?: string;
+  RECONNECT_GRACE_MS?: string;
+  ROOM_TTL_MS?: string;
+}
+
+/** Lee un entero del env con fallback y rango, igual que loadConfig en Node. */
+function envInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < min || value > max) return fallback;
+  return value;
 }
 
 /**
@@ -127,14 +139,19 @@ export class RoomDurableObject extends DurableObject<Env> {
   /** connectionId por socket, para el handler de cierre. */
   private readonly contexts = new Map<WebSocket, ConnectionContext>();
   private roomId: string | null = null;
+  /** Ya intentamos rehidratar desde storage en esta instancia. */
+  private restored = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
     this.rooms = new RoomManager({
-      reconnectGraceMs: 120_000,
-      roomTtlMs: 3_600_000,
-      options: DEFAULT_OPTIONS,
+      reconnectGraceMs: envInt(env.RECONNECT_GRACE_MS, 120_000, 10_000, 600_000),
+      roomTtlMs: envInt(env.ROOM_TTL_MS, 3_600_000, 60_000, 86_400_000),
+      options: {
+        ...DEFAULT_OPTIONS,
+        turnTimeoutMs: envInt(env.TURN_TIMEOUT_MS, DEFAULT_OPTIONS.turnTimeoutMs, 10_000, 300_000),
+      },
     });
 
     this.scheduler = new AlarmScheduler(ctx);
@@ -176,6 +193,47 @@ export class RoomDurableObject extends DurableObject<Env> {
     return (await this.ctx.storage.get<boolean>('claimed')) === true;
   }
 
+  /**
+   * Rehidrata desde storage la PRIMERA vez que esta instancia necesita la sala.
+   *
+   * No esta en el camino caliente: entre mensajes consecutivos la instancia
+   * sigue viva y el estado en memoria persiste. Esto corre una sola vez, tras
+   * una eviccion.
+   */
+  private async ensureRestored(): Promise<void> {
+    if (this.restored) return;
+    this.restored = true;
+
+    if (this.rooms.size > 0) return;
+    const restored = await restoreSnapshot(this.ctx.storage, this.rooms);
+    if (!restored) return;
+
+    const room = this.rooms.list()[0];
+    if (!room) return;
+    this.roomId = room.id;
+    consoleLogger.info(
+      { roomId: room.id, seats: room.seats.length, hasGame: room.game !== null },
+      'sala restaurada desde snapshot',
+    );
+  }
+
+  /**
+   * Persiste la sala.
+   *
+   * Un GameState de 10 jugadores son ~8KB de JSON, y una escritura de storage
+   * no cuenta como request: es parte de la invocacion que ya se esta pagando.
+   * A ~300 comandos por partida es irrelevante contra los limites del plan.
+   */
+  private async persist(): Promise<void> {
+    if (!this.roomId) return;
+    const room = this.rooms.find(this.roomId);
+    if (!room) {
+      await clearSnapshot(this.ctx.storage);
+      return;
+    }
+    await saveSnapshot(this.ctx.storage, room);
+  }
+
   override async fetch(request: Request): Promise<Response> {
     const upgrade = request.headers.get('Upgrade');
     if (upgrade !== 'websocket') {
@@ -185,6 +243,8 @@ export class RoomDurableObject extends DurableObject<Env> {
     const url = new URL(request.url);
     const roomId = url.searchParams.get('room');
     if (roomId) this.roomId = roomId;
+
+    await this.ensureRestored();
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
@@ -238,7 +298,9 @@ export class RoomDurableObject extends DurableObject<Env> {
     }
 
     const { id, ev, d } = envelope.data;
+    await this.ensureRestored();
     const ack = await this.gateway.dispatch(ctx, ev, d);
+    await this.persist();
 
     const response: ResEnvelope = { t: 'res', id, d: ack };
     try {
@@ -252,6 +314,7 @@ export class RoomDurableObject extends DurableObject<Env> {
     this.contexts.delete(socket);
     this.emitter.remove(ctx.connectionId);
     this.gateway.handleDisconnect(ctx, 'transport close');
+    void this.persist();
   }
 
   /**
@@ -263,6 +326,8 @@ export class RoomDurableObject extends DurableObject<Env> {
    */
   override async alarm(): Promise<void> {
     const now = Date.now();
+    // La alarm puede despertar una instancia nueva: hay que rehidratar antes.
+    await this.ensureRestored();
     if (!this.roomId) return;
 
     // Abandonos y salas vencidas.
@@ -279,6 +344,8 @@ export class RoomDurableObject extends DurableObject<Env> {
     if (room?.game && room.game.turnDeadline <= now) {
       this.gateway.handleTurnExpired(this.roomId);
     }
+
+    await this.persist();
 
     // Reprogramar mientras queden deadlines por vencer.
     const next = this.rooms.find(this.roomId);

@@ -432,6 +432,18 @@ export class RoomManager {
     return effects;
   }
 
+  /**
+   * Inserta una sala ya construida, sin pasar por createRoom.
+   *
+   * Lo usa el Durable Object al rehidratar desde un snapshot: la sala ya
+   * existia, con su codigo, sus asientos y su partida en curso. El indice de
+   * sockets queda vacio a proposito — las conexiones no sobreviven a la
+   * eviccion y cada jugador reclama su asiento con el token al reconectar.
+   */
+  adopt(room: Room): void {
+    this.rooms.set(room.id.toUpperCase(), room);
+  }
+
   removeRoom(roomId: string): void {
     const room = this.find(roomId);
     if (!room) return;
