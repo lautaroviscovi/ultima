@@ -53,6 +53,16 @@ class UnoSocket {
   /** Se dispara al (re)abrir: es donde el cliente reclama su asiento. */
   private onOpenHook: (() => void) | null = null;
 
+  /**
+   * La sala a la que hay que conectarse.
+   *
+   * En Node el servidor acepta cualquier conexion y la sala se resuelve por
+   * comando. En Cloudflare, el Worker necesita el codigo ANTES de aceptar el
+   * socket, porque de ahi sale a que Durable Object rutear. Por eso el codigo
+   * viaja en la URL, y si cambia hay que reconectar.
+   */
+  private roomId: string | null = null;
+
   get connected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
@@ -65,13 +75,23 @@ class UnoSocket {
     this.onOpenHook = hook;
   }
 
-  connect(): void {
+  connect(roomId?: string): void {
+    const sameRoom = roomId === undefined || roomId === this.roomId;
     if (
+      sameRoom &&
       this.ws &&
       (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
     ) {
       return;
     }
+
+    if (roomId !== undefined && roomId !== this.roomId) {
+      // Cambio de sala: hay que abrir una conexion nueva al DO que corresponda.
+      this.roomId = roomId;
+      this.ws?.close();
+      this.ws = null;
+    }
+
     this.intentionallyClosed = false;
     this.open();
   }
@@ -80,7 +100,8 @@ class UnoSocket {
     const store = useGameStore.getState();
     store.setConnection(this.attempts === 0 ? 'connecting' : 'reconnecting');
 
-    const url = SERVER_URL.replace(/^http/, 'ws') + '/ws';
+    const base = SERVER_URL.replace(/^http/, 'ws') + '/ws';
+    const url = this.roomId ? `${base}?room=${encodeURIComponent(this.roomId)}` : base;
     const ws = new WebSocket(url);
     this.ws = ws;
 
@@ -221,9 +242,27 @@ export function getSocket(): UnoSocket {
   return socket;
 }
 
-export function connect(): UnoSocket {
-  socket.connect();
+export function connect(roomId?: string): UnoSocket {
+  socket.connect(roomId);
   return socket;
+}
+
+/**
+ * Reserva un codigo de sala en el servidor.
+ *
+ * Solo el backend de Cloudflare lo necesita: alli la identidad del Durable
+ * Object se fija con el codigo antes de que la sala exista. El servidor Node
+ * devuelve 404 y en ese caso se sigue con el flujo de siempre.
+ */
+export async function claimRoom(): Promise<string | null> {
+  try {
+    const res = await fetch(`${SERVER_URL}/claim`, { method: 'POST' });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { ok: boolean; roomId?: string };
+    return body.ok && body.roomId ? body.roomId : null;
+  } catch {
+    return null;
+  }
 }
 
 export function disconnect(): void {

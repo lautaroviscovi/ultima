@@ -3,7 +3,7 @@ import type { Ack, JoinResult, PlayerCommand, ResumeResult } from '@uno/protocol
 import { useGameStore } from '../stores/game.js';
 import { useSessionStore } from '../stores/session.js';
 import { useUIStore } from '../stores/ui.js';
-import { connect, emitWithAck, getSocket } from './socket.js';
+import { claimRoom, connect, emitWithAck, getSocket } from './socket.js';
 import { registerListeners } from './listeners.js';
 
 /** Monotonico por cliente: correlaciona ack con comando y descarta reintentos. */
@@ -12,8 +12,8 @@ let clientSeq = 0;
 /** La sala cuyo asiento hay que reclamar al (re)conectar. */
 let activeRoomId: string | null = null;
 
-function ensureConnected(): void {
-  connect();
+function ensureConnected(roomId?: string): void {
+  connect(roomId);
   registerListeners();
 
   /**
@@ -33,7 +33,10 @@ export async function createRoom(
   nickname: string,
   options?: { targetScore?: number },
 ): Promise<Ack<JoinResult>> {
-  ensureConnected();
+  // En Cloudflare hay que reservar el codigo antes: el Durable Object se
+  // direcciona por nombre. En Node devuelve null y sigue el flujo normal.
+  const claimed = await claimRoom();
+  ensureConnected(claimed ?? undefined);
   const res = await emitWithAck<Ack<JoinResult>>('room:create', { nickname, options });
   if (res.ok) {
     useSessionStore.getState().remember(res.roomId, res.playerToken, res.playerId);
@@ -46,7 +49,7 @@ export async function createRoom(
 }
 
 export async function joinRoom(roomId: string, nickname: string): Promise<Ack<JoinResult>> {
-  ensureConnected();
+  ensureConnected(roomId);
   const res = await emitWithAck<Ack<JoinResult>>('room:join', { roomId, nickname });
   if (res.ok) {
     useSessionStore.getState().remember(res.roomId, res.playerToken, res.playerId);
@@ -66,7 +69,7 @@ export async function resumeSession(roomId: string): Promise<Ack<ResumeResult> |
   const session = useSessionStore.getState().sessionFor(roomId);
   if (!session) return null;
 
-  ensureConnected();
+  ensureConnected(roomId);
   const res = await emitWithAck<Ack<ResumeResult>>('session:resume', {
     roomId,
     playerToken: session.playerToken,

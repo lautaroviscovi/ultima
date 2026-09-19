@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "uno-server",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-15",
+  // nodejs_compat da crypto.getRandomValues para nanoid y poco mas.
+  "compatibility_flags": ["nodejs_compat"],
+
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "RoomDurableObject" }],
+  },
+
+  // SQLite-backed es el UNICO backend disponible en el plan free.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDurableObject"] }],
+
+  "observability": { "enabled": true },
+
+  "vars": {
+    // Se sobreescribe con `wrangler secret put` o en el dashboard.
+    "CLIENT_ORIGIN": "http://localhost:5173",
+  },
+}

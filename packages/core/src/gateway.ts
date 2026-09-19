@@ -27,6 +27,14 @@ export interface ConnectionContext {
   playerId: string | null;
   roomId: string | null;
   playerToken: string | null;
+  /**
+   * Codigo de sala impuesto por el transporte.
+   *
+   * Lo usa el Durable Object, donde la identidad del objeto ya fija el codigo
+   * antes de que la sala exista. En Node queda undefined y el manager genera
+   * el codigo como siempre.
+   */
+  forcedRoomId?: string;
 }
 
 function toErrorCode(error: unknown): { code: ProtocolErrorCode; message: string } {
@@ -184,6 +192,7 @@ export class Gateway {
             ctx.connectionId,
             now(),
             compact(input.options),
+            ctx.forcedRoomId,
           );
           this.bind(ctx, room.id, seat.playerId, seat.playerToken);
           logger.info({ roomId: room.id, playerId: seat.playerId }, 'sala creada');

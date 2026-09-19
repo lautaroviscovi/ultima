@@ -150,14 +150,24 @@ export class RoomManager {
     socketId: string,
     now: number,
     options?: Partial<GameOptions>,
+    /**
+     * Codigo de sala impuesto desde afuera.
+     *
+     * En Node el manager genera el codigo, porque tiene el Map de salas a mano
+     * para detectar colisiones. En un Durable Object la identidad viene de
+     * `idFromName(codigo)` ANTES de que exista la sala, asi que el codigo ya
+     * esta decidido y el manager tiene que usar ESE — si generara otro,
+     * `room:join` buscaria una sala que no existe con ese nombre.
+     */
+    forcedId?: string,
   ): {
     room: Room;
     seat: Seat;
   } {
-    let id = generateRoomCode();
+    let id = forcedId ?? generateRoomCode();
     // Colision de codigos: 31^4 = ~920k combinaciones, pero mejor no confiar.
     let attempts = 0;
-    while (this.rooms.has(id) && attempts++ < 50) id = generateRoomCode();
+    while (!forcedId && this.rooms.has(id) && attempts++ < 50) id = generateRoomCode();
 
     const seat = this.makeSeat(nickname, 0, socketId);
     const room: Room = {

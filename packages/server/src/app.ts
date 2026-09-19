@@ -2,14 +2,8 @@ import { createServer, type Server as HttpServer } from 'node:http';
 import express from 'express';
 import { Server } from 'socket.io';
 import { DEFAULT_OPTIONS, type GameOptions } from '@uno/engine';
-import {
-  CompositeEmitter,
-  Gateway,
-  RoomManager,
-  TurnScheduler,
-  silentLogger,
-  type Logger,
-} from '@uno/core';
+import { CompositeEmitter, Gateway, RoomManager, silentLogger, type Logger } from '@uno/core';
+import { TurnScheduler } from './TurnScheduler.js';
 import { registerSocketIO, SocketIOEmitter, type UnoServer } from './socketio.js';
 import { registerWsTransport, WsEmitter } from './wsTransport.js';
 

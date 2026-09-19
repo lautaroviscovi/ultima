@@ -3,6 +3,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['packages/*/src/**/*.test.ts'],
+    // Los tests del worker corren DENTRO de workerd con su propio config:
+    // `pnpm --filter @uno/worker test`. Probar un Durable Object con el
+    // runtime de Node no probaria nada de lo que importa.
+    exclude: ['**/node_modules/**', 'packages/worker/**'],
     // El cliente necesita DOM (sessionStorage/localStorage); el resto no.
     environmentMatchGlobs: [['packages/client/**', 'jsdom']],
     testTimeout: 20_000,
