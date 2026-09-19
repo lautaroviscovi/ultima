@@ -34,9 +34,15 @@ export async function createRoom(
   options?: { targetScore?: number },
 ): Promise<Ack<JoinResult>> {
   // En Cloudflare hay que reservar el codigo antes: el Durable Object se
-  // direcciona por nombre. En Node devuelve null y sigue el flujo normal.
-  const claimed = await claimRoom();
-  ensureConnected(claimed ?? undefined);
+  // direcciona por nombre. En Node el endpoint no existe y se sigue normal.
+  const claim = await claimRoom();
+  if (claim.kind === 'unreachable') {
+    // Fallar claro en vez de conectar a una sala que no existe.
+    const error = { ok: false, code: 'INTERNAL_ERROR', message: claim.message } as const;
+    useGameStore.getState().setError(error);
+    return error as Ack<JoinResult>;
+  }
+  ensureConnected(claim.kind === 'claimed' ? claim.roomId : undefined);
   const res = await emitWithAck<Ack<JoinResult>>('room:create', { nickname, options });
   if (res.ok) {
     useSessionStore.getState().remember(res.roomId, res.playerToken, res.playerId);

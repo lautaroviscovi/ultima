@@ -254,15 +254,40 @@ export function connect(roomId?: string): UnoSocket {
  * Object se fija con el codigo antes de que la sala exista. El servidor Node
  * devuelve 404 y en ese caso se sigue con el flujo de siempre.
  */
-export async function claimRoom(): Promise<string | null> {
+export type ClaimResult =
+  /** El backend reservo el codigo (Cloudflare). */
+  | { kind: 'claimed'; roomId: string }
+  /** Este backend no necesita reserva: el servidor genera el codigo (Node). */
+  | { kind: 'not-needed' }
+  /** No se pudo hablar con el servidor. */
+  | { kind: 'unreachable'; message: string };
+
+export async function claimRoom(): Promise<ClaimResult> {
+  let res: Response;
   try {
-    const res = await fetch(`${SERVER_URL}/claim`, { method: 'POST' });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { ok: boolean; roomId?: string };
-    return body.ok && body.roomId ? body.roomId : null;
+    res = await fetch(`${SERVER_URL}/claim`, { method: 'POST' });
   } catch {
-    return null;
+    /**
+     * Distinguir "no hace falta" de "no llegue" importa: con el backend de
+     * Node el /claim devuelve 404 y hay que seguir normal, pero si el servidor
+     * no responde hay que AVISAR. Antes los dos casos daban null y el cliente
+     * conectaba igual, a una sala inexistente, y el sintoma era
+     * "conexion cerrada" sin explicacion.
+     */
+    return { kind: 'unreachable', message: 'No se pudo contactar al servidor' };
   }
+
+  // 404 = este backend no tiene /claim (Node).
+  if (res.status === 404) return { kind: 'not-needed' };
+  if (!res.ok) return { kind: 'unreachable', message: `El servidor respondió ${res.status}` };
+
+  try {
+    const body = (await res.json()) as { ok: boolean; roomId?: string };
+    if (body.ok && body.roomId) return { kind: 'claimed', roomId: body.roomId };
+  } catch {
+    // Cuerpo ilegible: lo tratamos como servidor inalcanzable.
+  }
+  return { kind: 'unreachable', message: 'El servidor no pudo reservar una sala' };
 }
 
 export function disconnect(): void {

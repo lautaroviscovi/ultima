@@ -50,6 +50,53 @@ describe('router', () => {
   });
 });
 
+describe('CORS', () => {
+  // El wrangler.jsonc de test define CLIENT_ORIGIN con localhost:5173.
+  const ALLOWED = 'http://localhost:5173';
+
+  it('devuelve el header para un origen permitido', async () => {
+    const res = await SELF.fetch('https://example.com/health', {
+      headers: { Origin: ALLOWED },
+    });
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED);
+  });
+
+  it('NO devuelve header para un origen desconocido', async () => {
+    /**
+     * Hacer fallback al primer origen permitido seria incorrecto: el navegador
+     * lo bloquea igual porque no coincide, pero le estaria diciendo a quien
+     * sondea cual es el dominio autorizado. Este bug estuvo en produccion.
+     */
+    const res = await SELF.fetch('https://example.com/health', {
+      headers: { Origin: 'https://sitio-malicioso.com' },
+    });
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
+
+  it('nunca devuelve el comodin', async () => {
+    const res = await SELF.fetch('https://example.com/health', {
+      headers: { Origin: ALLOWED },
+    });
+    expect(res.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
+  });
+
+  it('marca Vary: Origin para que no se cachee cruzado', async () => {
+    const res = await SELF.fetch('https://example.com/health', {
+      headers: { Origin: ALLOWED },
+    });
+    expect(res.headers.get('Vary')).toContain('Origin');
+  });
+
+  it('responde el preflight', async () => {
+    const res = await SELF.fetch('https://example.com/claim', {
+      method: 'OPTIONS',
+      headers: { Origin: ALLOWED },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Methods')).toContain('POST');
+  });
+});
+
 describe('ruteo a Durable Objects', () => {
   it('el mismo codigo siempre da el MISMO objeto', () => {
     const a = env.ROOM.idFromName('ABCD');

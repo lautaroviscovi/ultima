@@ -16,7 +16,11 @@
   "observability": { "enabled": true },
 
   "vars": {
-    // Se sobreescribe con `wrangler secret put` o en el dashboard.
-    "CLIENT_ORIGIN": "http://localhost:5173",
+    // Lista EXACTA de origenes permitidos, separados por coma.
+    //
+    // Nunca '*': con '*' cualquier pagina puede abrir sockets contra el
+    // servidor. Si algo no conecta, se arregla la lista, no se abre.
+    // El localhost queda para desarrollo.
+    "CLIENT_ORIGIN": "https://uno-delta-two.vercel.app,https://uno-lautaro-viscovis-projects.vercel.app,http://localhost:5173",
   },
 }

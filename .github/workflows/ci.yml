@@ -26,32 +26,6 @@ jobs:
       # Que los artefactos de deploy compilen de verdad, no solo los tests.
       - run: pnpm --filter @uno/server build
       - run: pnpm --filter @uno/client build
-
-  docker:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # La imagen se construye en CI porque no todos tienen Docker local:
-      # si el Dockerfile se rompe, conviene enterarse en el PR y no al desplegar.
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          load: true
-          tags: uno-server:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: El contenedor arranca y responde /health
-        run: |
-          docker run -d --name uno -p 3000:3000 \
-            -e NODE_ENV=production \
-            -e CLIENT_ORIGIN=https://example.com \
-            uno-server:ci
-          for i in $(seq 1 30); do
-            if curl -fs http://localhost:3000/health > /dev/null; then
-              echo "health OK"; curl -s http://localhost:3000/health; exit 0
-            fi
-            sleep 1
-          done
-          echo "el contenedor no respondio"; docker logs uno; exit 1
+      # Los tests del Durable Object corren dentro de workerd real: probarlo
+      # con mocks no cubriria el ciclo de vida del objeto ni las alarms.
+      - run: pnpm --filter @uno/worker test

@@ -17,13 +17,24 @@ function normalizeRoomId(raw: string): string {
 }
 
 function corsHeaders(origin: string | null, allowed: string[]): Record<string, string> {
-  // Lista exacta, nunca '*': con '*' cualquier pagina puede abrir sockets.
-  const allow = origin && allowed.includes(origin) ? origin : allowed[0];
-  return {
-    'Access-Control-Allow-Origin': allow ?? '',
+  const base = {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    // La respuesta depende del Origin: sin esto, un proxy podria cachear la
+    // respuesta de un origen permitido y servirsela a otro.
+    Vary: 'Origin',
   };
+
+  /**
+   * Un origen que NO esta en la lista no recibe header de CORS.
+   *
+   * Hacer fallback al primer origen permitido seria incorrecto: el navegador
+   * lo bloquea igual porque no coincide, pero le estaria diciendo a quien
+   * sondea cual es el dominio autorizado. Lista exacta, y nunca '*'.
+   */
+  if (!origin || !allowed.includes(origin)) return base;
+
+  return { ...base, 'Access-Control-Allow-Origin': origin };
 }
 
 function json(data: unknown, init: ResponseInit = {}, cors: Record<string, string> = {}): Response {

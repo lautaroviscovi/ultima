@@ -15,16 +15,16 @@ existentes topan en 4.
 
 ## Estado
 
-| Fase | Qué                           | Estado                          |
-| ---- | ----------------------------- | ------------------------------- |
-| 0    | Andamiaje del monorepo        | ✅                              |
-| 1    | Engine puro testeado, sin UI  | ✅                              |
-| 2    | Server + protocolo, sin UI    | ✅                              |
-| 3    | Cliente: esqueleto y conexión | ✅                              |
-| 4    | Componentes en Storybook      | ✅                              |
-| 5    | Mesa de juego conectada       | ✅                              |
-| 6    | Animaciones y pulido          | ✅                              |
-| 7    | Deploy y endurecimiento       | 🟡 configurado, falta desplegar |
+| Fase | Qué                           | Estado               |
+| ---- | ----------------------------- | -------------------- |
+| 0    | Andamiaje del monorepo        | ✅                   |
+| 1    | Engine puro testeado, sin UI  | ✅                   |
+| 2    | Server + protocolo, sin UI    | ✅                   |
+| 3    | Cliente: esqueleto y conexión | ✅                   |
+| 4    | Componentes en Storybook      | ✅                   |
+| 5    | Mesa de juego conectada       | ✅                   |
+| 6    | Animaciones y pulido          | ✅                   |
+| 7    | Deploy y endurecimiento       | ✅ **en producción** |
 
 ## Paquetes
 
@@ -157,14 +157,21 @@ el codigo:
 - **El countdown se deriva de `turnDeadline`**, un timestamp absoluto del
   servidor. El timer autoritativo vive alla; el cliente solo pinta pixeles.
 
-## Deploy
+## En producción
 
-Todo configurado: `Dockerfile`, `fly.toml`, `vercel.json` y `.env.example`.
-Los pasos para desplegar estan en **[DEPLOY.md](DEPLOY.md)**.
+- **Jugar:** https://uno-delta-two.vercel.app
+- **Servidor:** https://uno-server.viscovilautaro.workers.dev
 
-Front a Vercel, servidor a Fly.io. Vercel no sirve para el servidor: sus
-funciones son efimeras y las conexiones WebSocket de larga duracion no son su
-modelo.
+Front en Vercel, servidor en **Cloudflare Workers + Durable Objects**. Una sala
+es un Durable Object: un objeto con estado en memoria e identidad estable por
+codigo de sala, que es exactamente la forma del `RoomManager`.
+
+Se eligio sobre Fly.io porque el plan free de Cloudflare cubre este caso sin
+tarjeta: 100.000 requests/dia y 13.000 GB-s, que son ~22 partidas completas de
+10 jugadores por dia. Fly hoy factura por uso (~4 USD/mes con la maquina
+siempre prendida).
+
+Los pasos para redesplegar estan en **[DEPLOY.md](DEPLOY.md)**.
 
 El servidor **valida la config al arrancar** y falla con un mensaje claro si
 algo esta mal — fallar al arrancar es mucho mejor que fallar en la primera
