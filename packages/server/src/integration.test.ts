@@ -65,6 +65,22 @@ describe.each(TRANSPORTS)('transporte %s', (transport) => {
       5000,
       'reparto y turno propagados a todos',
     );
+
+    /**
+     * Si la carta inicial volteada fue un wild, la partida arranca en
+     * `choosing_color` y no en `awaiting_turn`. Lo resolvemos aca para que
+     * ningun test tenga que saberlo — antes, cada test que asumia
+     * `awaiting_turn` fallaba segun el seed.
+     */
+    const holder = all.find((c) => c.state?.currentPlayerId === c.playerId);
+    if (holder?.state?.phase === 'choosing_color') {
+      await holder.command({ type: 'CHOOSE_COLOR', color: 'red' });
+      await host.waitFor(
+        () => all.every((c) => c.state?.phase !== 'choosing_color'),
+        2000,
+        'color inicial elegido',
+      );
+    }
     return res;
   }
 
@@ -382,13 +398,6 @@ describe.each(TRANSPORTS)('transporte %s', (transport) => {
       // Ojo: el turno puede no ser del asiento 0 (la carta inicial pudo ser un
       // skip/reverse/draw2), asi que lo tomamos del estado propio de cada cliente.
       const client = turnHolder(all);
-      // Solo tiene sentido robar en awaiting_turn: esperamos esa fase en vez de
-      // asumirla, o el test depende del seed.
-      await client.waitFor(
-        () => client.state?.phase === 'awaiting_turn',
-        2000,
-        'fase awaiting_turn',
-      );
       const handBefore = client.state!.you.hand.length;
 
       const first = await client.command({ type: 'DRAW_CARD' }, { clientSeq: 7 });
