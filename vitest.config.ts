@@ -2,7 +2,19 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['packages/*/src/**/*.test.ts'],
+    /**
+     * `.tsx` tambien, y no es cosmetico.
+     *
+     * Un test de componente lleva JSX, asi que se escribe `.test.tsx`. Con el
+     * glob anterior (`*.test.ts` a secas) ese archivo NO se recogia y
+     * `pnpm test` pasaba verde igual — el peor modo de falla posible: creer
+     * que hay cobertura cuando no corrio nada.
+     *
+     * Hoy no hay ningun test de render en el repo, pero `jsdom` y
+     * `@testing-library/react` ya estan instalados, asi que la trampa estaba
+     * armada para el primero que lo intentara.
+     */
+    include: ['packages/*/src/**/*.test.{ts,tsx}'],
     // Los tests del worker corren DENTRO de workerd con su propio config:
     // `pnpm --filter @uno/worker test`. Probar un Durable Object con el
     // runtime de Node no probaria nada de lo que importa.
