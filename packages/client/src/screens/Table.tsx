@@ -28,6 +28,7 @@ import { useTurnTimer } from '../hooks/useTurnTimer.js';
 import { useEventLog } from '../hooks/useEventLog.js';
 import { useGameSounds } from '../hooks/useGameSounds.js';
 import { useGameMoments } from '../hooks/useGameMoments.js';
+import { useFitsTable } from '../hooks/useFitsTable.js';
 import { useReducedMotion } from '../hooks/useReducedMotion.js';
 import { unlockAudio } from '../net/sound.js';
 import { ColorPicker } from '../components/ColorPicker.js';
@@ -62,6 +63,7 @@ export function Table(): JSX.Element {
   const [sortMode, setSortMode] = useSortMode();
   useGameSounds();
   const { flights, penalty } = useGameMoments();
+  const fitsTable = useFitsTable();
 
   const colorPickerOpen = useUIStore((s) => s.colorPickerOpen);
   const pendingWildCardId = useUIStore((s) => s.pendingWildCardId);
@@ -69,7 +71,6 @@ export function Table(): JSX.Element {
   const openColorPicker = useUIStore((s) => s.openColorPicker);
   const closeColorPicker = useUIStore((s) => s.closeColorPicker);
 
-  const [tooNarrow, setTooNarrow] = useState(() => window.innerWidth < MIN_WIDTH);
   const [reverseFlash, setReverseFlash] = useState(false);
   const lastDirection = useRef<1 | -1 | null>(null);
 
@@ -95,12 +96,6 @@ export function Table(): JSX.Element {
     const unlock = (): void => unlockAudio();
     window.addEventListener('pointerdown', unlock, { once: true });
     return () => window.removeEventListener('pointerdown', unlock);
-  }, []);
-
-  useEffect(() => {
-    const onResize = (): void => setTooNarrow(window.innerWidth < MIN_WIDTH);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   /**
@@ -195,7 +190,7 @@ export function Table(): JSX.Element {
   }
 
   // Desktop-only por decision de producto: aviso claro en vez de layout roto.
-  if (tooNarrow) {
+  if (!fitsTable) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-felt-dark p-8 text-center text-white">
         <p className="font-display text-display-sm font-bold">Necesitás una ventana más ancha</p>

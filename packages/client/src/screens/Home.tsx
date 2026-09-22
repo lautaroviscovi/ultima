@@ -2,6 +2,8 @@ import { useState, type FormEvent, type InputHTMLAttributes } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createRoom, joinRoom } from '../net/commands.js';
 import { useSessionStore } from '../stores/session.js';
+import { useFitsTable } from '../hooks/useFitsTable.js';
+import { MIN_WIDTH } from '../components/TableLayout.js';
 
 /**
  * El campo de texto de esta pantalla.
@@ -28,6 +30,7 @@ export function Home(): JSX.Element {
   const nickname = useSessionStore((s) => s.nickname);
   const setNickname = useSessionStore((s) => s.setNickname);
   const sessions = useSessionStore((s) => s.sessions);
+  const fitsTable = useFitsTable();
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -68,13 +71,32 @@ export function Home(): JSX.Element {
         </h1>
         <p className="mb-8 text-center text-body text-white/60">hasta 10 jugadores</p>
 
+        {/*
+          El aviso va ACA y no en la mesa.
+          
+          El chequeo de ancho existia solo en `Table`, asi que desde el
+          telefono se podia crear la sala, copiar el codigo e invitar gente —
+          y el cartel aparecia recien al empezar la partida, cuando ya habia
+          cinco personas esperando.
+
+          Es una NOTA, no un bloqueo: crear una sala desde el telefono para que
+          otros jueguen es legitimo, y el codigo se dicta por la llamada igual.
+        */}
+        {!fitsTable && (
+          <p className="mb-6 rounded-lg bg-intent-warn/15 px-4 py-3 text-center text-body text-intent-warn">
+            Esta pantalla es angosta para la mesa, que necesita {MIN_WIDTH}px. Podés crear la sala
+            igual y pasar el código, pero para <strong className="font-bold">jugar</strong> vas a
+            necesitar una ventana más ancha.
+          </p>
+        )}
+
         <label className="block mb-6">
           <span className="text-body text-white/70">Tu nombre</span>
           <Field
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             maxLength={20}
-            placeholder="Lautaro"
+            placeholder="La dacha de Stalin"
             className="mt-1"
           />
         </label>

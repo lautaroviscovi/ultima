@@ -5,6 +5,7 @@ import { useGameStore } from '../stores/game.js';
 import { useSessionStore } from '../stores/session.js';
 import { useConnection } from '../hooks/useGame.js';
 import { ConnectionBadge } from '../components/ConnectionBadge.js';
+import { PlayerAvatar } from '../components/PlayerAvatar.js';
 
 const TARGET_SCORES = [200, 300, 500] as const;
 
@@ -105,12 +106,30 @@ export function Room(): JSX.Element {
                 key={player.id}
                 className="flex items-center gap-3 rounded-lg bg-raised px-3 py-2"
               >
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    player.connected ? 'bg-intent-ok' : 'bg-white/30'
-                  }`}
-                />
-                <span className="flex-1">{player.nickname}</span>
+                {/* El avatar es el MISMO componente que usa la mesa: el color
+                    de una persona no puede cambiar entre el lobby y la
+                    partida, o se lee como si fueran dos jugadores. */}
+                <div className="relative">
+                  <PlayerAvatar
+                    nickname={player.nickname}
+                    seat={player.seat}
+                    dimmed={!player.connected}
+                  />
+                  {/* El dot va SOBRE el avatar, no al lado: es un atributo de
+                      esa persona, no un item mas de la fila. */}
+                  <span
+                    title={player.connected ? 'en línea' : 'sin conexión'}
+                    // El anillo recorta el dot contra la fila. Va como
+                    // `border` con el color de la superficie de atras:
+                    // `ring-sunken` no existe (no hay `ringColor` en la
+                    // config) y habria quedado sin recorte, en silencio.
+                    className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full
+                                border-2 border-[#16301f] ${
+                                  player.connected ? 'bg-intent-ok' : 'bg-white/40'
+                                }`}
+                  />
+                </div>
+                <span className="flex-1 truncate text-body">{player.nickname}</span>
                 {player.id === room.hostId && (
                   <span className="text-mini text-brand-accent">anfitrión</span>
                 )}
