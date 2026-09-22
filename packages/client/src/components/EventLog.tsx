@@ -3,8 +3,8 @@ import type { LogEntry } from '../hooks/useEventLog.js';
 
 const TONE: Record<LogEntry['tone'], string> = {
   normal: 'text-white/70',
-  alert: 'text-uno-yellow',
-  good: 'text-uno-green',
+  alert: 'text-intent-warn',
+  good: 'text-intent-ok',
 };
 
 /**
@@ -25,7 +25,7 @@ export function EventLog({ entries }: { entries: LogEntry[] }): JSX.Element | nu
       aria-live="polite"
       aria-label="Registro de la partida"
       className="pointer-events-none absolute bottom-2 right-3 max-h-24 w-64 overflow-hidden
-                 rounded-lg bg-scrim px-3 py-1.5 text-[0.7rem] leading-snug backdrop-blur-sm"
+                 rounded-lg bg-scrim px-3 py-1.5 text-micro leading-snug backdrop-blur-sm"
     >
       {entries.slice(-4).map((entry) => (
         <p key={entry.id} className={`truncate ${TONE[entry.tone]}`}>

@@ -23,8 +23,8 @@ export function ErrorToast({
   return (
     <div
       role="alert"
-      className="absolute left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg bg-uno-red px-5 py-2
-                 text-sm font-bold text-white shadow-lg"
+      className="absolute left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg bg-intent-danger px-5 py-2
+                 text-body font-bold text-white shadow-lg"
     >
       {error.message}
     </div>

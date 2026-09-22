@@ -47,7 +47,7 @@ export function ColorPicker({ open, onPick, onCancel }: ColorPickerProps): JSX.E
           <button
             type="button"
             onClick={onCancel}
-            className="mt-4 w-full rounded-lg py-2 text-sm text-white/60 hover:text-white"
+            className="mt-4 w-full rounded-lg py-2 text-body text-white/60 hover:text-white"
           >
             Cancelar
           </button>

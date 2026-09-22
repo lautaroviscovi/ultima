@@ -25,10 +25,10 @@ export function RoundOverlay({
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-scrim p-6">
       <div className="w-full max-w-md rounded-2xl bg-overlay p-6 shadow-modal">
-        <p className="text-center text-sm uppercase tracking-widest text-white/50">
+        <p className="text-center text-mini uppercase tracking-widest text-white/50">
           {isGameOver ? 'Fin de la partida' : `Fin de la ronda ${state.round + 1}`}
         </p>
-        <h2 className="mb-5 text-center text-3xl font-black text-white">
+        <h2 className="mb-5 text-center font-display text-display font-black text-white">
           {youWon ? '¡Ganaste!' : `Ganó ${winner?.nickname ?? '—'}`}
         </h2>
 
@@ -40,14 +40,14 @@ export function RoundOverlay({
                 player.id === state.you.id ? 'bg-raised-hover' : 'bg-raised'
               }`}
             >
-              <span className="w-5 text-center text-sm text-white/40">{i + 1}</span>
+              <span className="w-5 text-center text-body tabular-nums text-white/40">{i + 1}</span>
               <span className="flex-1 truncate text-white">{player.nickname}</span>
               <span className="font-bold text-white">{player.score}</span>
             </li>
           ))}
         </ol>
 
-        <p className="mb-4 text-center text-xs text-white/40">
+        <p className="mb-4 text-center text-mini text-white/40">
           objetivo: {state.options.targetScore} puntos
         </p>
 
@@ -62,7 +62,7 @@ export function RoundOverlay({
           ) : isHost ? (
             <button
               onClick={onNextRound}
-              className="flex-1 rounded-lg bg-uno-green py-3 font-bold text-white
+              className="flex-1 rounded-lg bg-intent-ok py-3 font-bold text-brand-ink
                          hover:brightness-110"
             >
               Siguiente ronda

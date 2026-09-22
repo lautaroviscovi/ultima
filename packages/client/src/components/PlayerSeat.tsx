@@ -15,10 +15,18 @@ export interface PlayerSeatProps {
 /** Hasta 7 dorsos: la longitud del abanico se lee sin contar numeros. */
 const MAX_FAN = 7;
 
+/**
+ * El anillo del turno comunica URGENCIA, no un color al que se pueda jugar.
+ *
+ * Usaba `stroke-uno-yellow` / `stroke-uno-red`, que son pigmentos de carta:
+ * elegidos para leerse sobre el blanco del ovalo, no sobre el fieltro, y
+ * atados al mazo. Si algun dia se cambia el rojo de las cartas, el timer no
+ * deberia cambiar con el.
+ */
 function urgencyColor(progress: number): string {
   if (progress > 0.33) return 'stroke-white';
-  if (progress > 0.11) return 'stroke-uno-yellow';
-  return 'stroke-uno-red';
+  if (progress > 0.11) return 'stroke-intent-warn';
+  return 'stroke-intent-urgent';
 }
 
 export function PlayerSeat({
@@ -75,7 +83,7 @@ export function PlayerSeat({
 
       <div className="flex w-full items-center gap-1">
         <span
-          className={`truncate text-xs font-bold ${isCurrent ? 'text-white' : 'text-white/75'}`}
+          className={`truncate text-mini font-bold ${isCurrent ? 'text-white' : 'text-white/75'}`}
           title={player.nickname}
         >
           {player.nickname}
@@ -103,16 +111,16 @@ export function PlayerSeat({
             />
           ))}
         </AnimatePresence>
-        {player.cardCount === 0 && <span className="text-[0.65rem] text-white/50">sin cartas</span>}
+        {player.cardCount === 0 && <span className="text-micro text-white/50">sin cartas</span>}
       </div>
 
-      <div className="flex w-full items-baseline justify-between text-[0.65rem]">
+      <div className="flex w-full items-baseline justify-between text-micro">
         <span
           className={`font-bold ${
             player.cardCount === 1
-              ? 'text-uno-red'
+              ? 'text-intent-urgent'
               : player.cardCount === 2
-                ? 'text-uno-yellow'
+                ? 'text-intent-warn'
                 : 'text-white/80'
           }`}
         >
@@ -121,7 +129,7 @@ export function PlayerSeat({
         {!compact && <span className="text-white/50">{player.score} pts</span>}
       </div>
 
-      {status && <span className="text-[0.6rem] text-white/50">{status}</span>}
+      {status && <span className="text-micro text-white/50">{status}</span>}
 
       {/*
         La acusacion es un click sobre el jugador, que es donde tu atencion ya
@@ -136,7 +144,7 @@ export function PlayerSeat({
         >
           {/* Opaco, no semitransparente: con el nombre translucido detras el
               texto no se lee y el boton no se reconoce como accionable. */}
-          <span className="text-[0.6rem] font-normal opacity-90">{player.nickname}</span>
+          <span className="text-micro font-normal opacity-90">{player.nickname}</span>
           <span>¡No dijo ÚLTIMA!</span>
         </button>
       )}

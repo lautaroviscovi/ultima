@@ -70,23 +70,24 @@ export function Room(): JSX.Element {
       <div className="mx-auto max-w-2xl">
         <div className="flex items-start justify-between mb-8">
           <div>
-            <p className="text-sm text-white/60">Código de la sala</p>
+            <p className="text-body text-white/60">Código de la sala</p>
             <button
               onClick={copyCode}
               title="Copiar"
-              className="font-mono text-5xl font-black tracking-[0.2em] hover:text-uno-yellow"
+              className="font-display text-display-xl font-black tabular-nums tracking-[0.2em]
+                         hover:text-brand-accent"
             >
               {roomId}
             </button>
-            <p className="text-sm text-white/50 h-5">
+            <p className="h-5 text-body text-white/50">
               {copied ? 'copiado' : 'tocá para copiar y dictarlo por la llamada'}
             </p>
           </div>
           <ConnectionBadge status={connection} />
         </div>
 
-        <div className="rounded-xl bg-raised p-4 mb-6">
-          <div className="flex items-baseline justify-between mb-3">
+        <div className="mb-6 rounded-xl bg-sunken p-4">
+          <div className="mb-3 flex items-baseline justify-between">
             <h2 className="font-bold">
               Jugadores{' '}
               <span className="text-white/50 font-normal">
@@ -94,7 +95,7 @@ export function Room(): JSX.Element {
               </span>
             </h2>
             {room.players.length < 2 && (
-              <span className="text-sm text-white/50">faltan al menos 2</span>
+              <span className="text-body text-white/50">faltan al menos 2</span>
             )}
           </div>
 
@@ -111,10 +112,10 @@ export function Room(): JSX.Element {
                 />
                 <span className="flex-1">{player.nickname}</span>
                 {player.id === room.hostId && (
-                  <span className="text-xs text-uno-yellow">anfitrión</span>
+                  <span className="text-mini text-brand-accent">anfitrión</span>
                 )}
                 {player.id === session?.playerId && (
-                  <span className="text-xs text-white/50">vos</span>
+                  <span className="text-mini text-white/50">vos</span>
                 )}
               </li>
             ))}
@@ -122,10 +123,10 @@ export function Room(): JSX.Element {
         </div>
 
         {isHost && (
-          <div className="rounded-xl bg-raised p-4 mb-6">
-            <p className="font-bold mb-1">Objetivo de puntaje</p>
+          <div className="mb-6 rounded-xl bg-sunken p-4">
+            <p className="mb-1 font-bold">Objetivo de puntaje</p>
             {/* Con 10 jugadores una ronda suma 9 manos: 500 puede ser largo. */}
-            <p className="text-sm text-white/50 mb-3">
+            <p className="mb-3 text-body text-white/50">
               Con muchos jugadores cada ronda suma bastante. 200 es una partida corta.
             </p>
             <div className="flex gap-2">
@@ -134,7 +135,9 @@ export function Room(): JSX.Element {
                   key={score}
                   onClick={() => setTargetScore(score)}
                   className={`rounded-lg px-4 py-2 font-bold ${
-                    targetScore === score ? 'bg-uno-yellow text-black' : 'bg-raised'
+                    targetScore === score
+                      ? 'bg-brand-accent text-brand-ink'
+                      : 'bg-raised hover:bg-raised-hover'
                   }`}
                 >
                   {score}
@@ -145,7 +148,7 @@ export function Room(): JSX.Element {
         )}
 
         {lastError && (
-          <p role="alert" className="mb-4 rounded-lg bg-uno-red/20 px-4 py-2 text-sm">
+          <p role="alert" className="mb-4 rounded-lg bg-intent-danger/20 px-4 py-2 text-body">
             {lastError.message}
           </p>
         )}
@@ -155,13 +158,13 @@ export function Room(): JSX.Element {
             <button
               onClick={handleStart}
               disabled={!canStart || starting}
-              className="flex-1 rounded-lg bg-uno-green py-3 text-lg font-bold
-                         hover:brightness-110 disabled:opacity-40"
+              className="flex-1 rounded-lg bg-intent-ok py-3 font-display text-lead font-black
+                         text-brand-ink hover:brightness-110 disabled:opacity-40"
             >
               {starting ? 'Repartiendo…' : 'Empezar partida'}
             </button>
           ) : (
-            <p className="flex-1 rounded-lg bg-raised py-3 text-center text-white/60">
+            <p className="flex-1 rounded-lg bg-raised py-3 text-center text-body text-white/60">
               Esperando al anfitrión…
             </p>
           )}
@@ -169,7 +172,7 @@ export function Room(): JSX.Element {
             onClick={() => {
               void leaveRoom(roomId).then(() => navigate('/'));
             }}
-            className="rounded-lg bg-raised px-5 py-3 hover:bg-active"
+            className="rounded-lg bg-raised px-5 py-3 text-body hover:bg-raised-hover"
           >
             Salir
           </button>

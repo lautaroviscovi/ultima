@@ -1,7 +1,27 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type InputHTMLAttributes } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createRoom, joinRoom } from '../net/commands.js';
 import { useSessionStore } from '../stores/session.js';
+
+/**
+ * El campo de texto de esta pantalla.
+ *
+ * Existe porque el bloque de clases estaba duplicado literal en los dos
+ * inputs, y esa es la forma en que dos campos empiezan a divergir sin que
+ * nadie lo decida.
+ *
+ * No lleva `focus:ring` propio: `index.css` ya define un `:focus-visible`
+ * global con `--intent-focus`, y dos anillos compitiendo se ven como un bug.
+ */
+function Field({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>): JSX.Element {
+  return (
+    <input
+      {...props}
+      className={`w-full rounded-lg bg-raised px-4 py-3 text-lead outline-none
+                  ring-1 ring-subtle ${className}`}
+    />
+  );
+}
 
 export function Home(): JSX.Element {
   const navigate = useNavigate();
@@ -46,17 +66,16 @@ export function Home(): JSX.Element {
         <h1 className="mb-1 text-center font-display text-display-xl font-black text-brand-accent">
           ÚLTIMA
         </h1>
-        <p className="text-center text-white/60 mb-8">hasta 10 jugadores</p>
+        <p className="mb-8 text-center text-body text-white/60">hasta 10 jugadores</p>
 
         <label className="block mb-6">
-          <span className="text-sm text-white/70">Tu nombre</span>
-          <input
+          <span className="text-body text-white/70">Tu nombre</span>
+          <Field
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             maxLength={20}
             placeholder="Lautaro"
-            className="mt-1 w-full rounded-lg bg-raised px-4 py-3 text-lg outline-none
-                       ring-1 ring-white/20 focus:ring-2 focus:ring-uno-yellow"
+            className="mt-1"
           />
         </label>
 
@@ -64,52 +83,51 @@ export function Home(): JSX.Element {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-lg bg-uno-red py-3 text-lg font-bold
-                       hover:brightness-110 disabled:opacity-50"
+            className="w-full rounded-lg bg-brand-accent py-3 font-display text-lead font-black
+                       text-brand-ink hover:brightness-110 disabled:opacity-50"
           >
             Crear sala
           </button>
         </form>
 
-        <div className="flex items-center gap-3 mb-6 text-white/40 text-sm">
+        <div className="mb-6 flex items-center gap-3 text-body text-white/40">
           <div className="h-px flex-1 bg-active" />
           o unite a una
           <div className="h-px flex-1 bg-active" />
         </div>
 
         <form onSubmit={handleJoin} className="flex gap-2">
-          <input
+          <Field
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             maxLength={6}
             placeholder="CÓDIGO"
-            className="flex-1 rounded-lg bg-raised px-4 py-3 text-lg font-mono tracking-[0.3em]
-                       uppercase outline-none ring-1 ring-white/20 focus:ring-2 focus:ring-uno-yellow"
+            className="flex-1 font-display uppercase tracking-[0.3em]"
           />
           <button
             type="submit"
             disabled={busy}
-            className="rounded-lg bg-uno-blue px-6 py-3 font-bold hover:brightness-110
-                       disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-raised px-6 py-3 text-body font-bold
+                       hover:bg-raised-hover disabled:opacity-50"
           >
             Entrar
           </button>
         </form>
 
         {error && (
-          <p role="alert" className="mt-4 rounded-lg bg-uno-red/20 px-4 py-2 text-sm">
+          <p role="alert" className="mt-4 rounded-lg bg-intent-danger/20 px-4 py-2 text-body">
             {error}
           </p>
         )}
 
         {openRooms.length > 0 && (
           <div className="mt-8">
-            <p className="text-sm text-white/50 mb-2">Volver a una partida</p>
+            <p className="mb-2 text-body text-white/50">Volver a una partida</p>
             {openRooms.map((roomId) => (
               <button
                 key={roomId}
                 onClick={() => navigate(`/room/${roomId}`)}
-                className="mr-2 rounded-lg bg-raised px-4 py-2 font-mono hover:bg-active"
+                className="mr-2 rounded-lg bg-raised px-4 py-2 font-display tracking-wider hover:bg-active"
               >
                 {roomId}
               </button>

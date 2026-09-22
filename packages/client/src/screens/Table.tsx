@@ -198,7 +198,7 @@ export function Table(): JSX.Element {
   if (tooNarrow) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-felt-dark p-8 text-center text-white">
-        <p className="text-xl font-bold">Necesitás una ventana más ancha</p>
+        <p className="font-display text-display-sm font-bold">Necesitás una ventana más ancha</p>
         <p className="max-w-sm text-white/60">
           La mesa de hasta 10 jugadores necesita al menos {MIN_WIDTH}px para que se lea bien.
           Agrandá la ventana o pasá a una pantalla más grande.
@@ -232,7 +232,7 @@ export function Table(): JSX.Element {
         </AnimatePresence>
         <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
           <ConnectionBadge status={connection} />
-          <span className="rounded-full bg-sunken px-3 py-1 font-mono text-xs text-white/60">
+          <span className="rounded-full bg-sunken px-3 py-1 font-display text-mini tracking-wider text-white/60">
             {roomId}
           </span>
           {isMyTurn && timer.secondsLeft <= 15 && (
@@ -253,7 +253,7 @@ export function Table(): JSX.Element {
             onClick={() =>
               setSortMode(sortMode === 'draw' ? 'color' : sortMode === 'color' ? 'value' : 'draw')
             }
-            className="rounded-full bg-sunken px-3 py-1 text-xs text-white/70 hover:bg-scrim"
+            className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
           >
             orden: {sortMode === 'draw' ? 'robo' : sortMode === 'color' ? 'color' : 'valor'}
           </button>
@@ -261,13 +261,13 @@ export function Table(): JSX.Element {
             onClick={toggleSound}
             aria-pressed={soundEnabled}
             title={soundEnabled ? 'Silenciar' : 'Activar sonido'}
-            className="rounded-full bg-sunken px-3 py-1 text-xs text-white/70 hover:bg-scrim"
+            className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
           >
             {soundEnabled ? 'sonido' : 'silencio'}
           </button>
           <button
             onClick={handleLeave}
-            className="rounded-full bg-sunken px-3 py-1 text-xs text-white/70 hover:bg-scrim"
+            className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
           >
             salir
           </button>

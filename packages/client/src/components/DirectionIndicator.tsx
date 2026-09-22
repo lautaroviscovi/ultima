@@ -25,6 +25,8 @@ export function DirectionIndicator({
   return (
     <motion.div
       aria-label={direction === 1 ? 'Sentido horario' : 'Sentido antihorario'}
+      // `uno-yellow` a proposito: es el eco de la carta reverse jugada, no un
+      // estado de UI. Misma excepcion documentada en ReverseFlash.
       className={`pointer-events-none select-none text-figure-md ${
         flash ? 'text-uno-yellow' : 'text-white/35'
       }`}
