@@ -50,6 +50,34 @@ git diff --stat <ref-anterior> HEAD -- packages/engine packages/protocol package
 Vacío significa que alcanza con desplegar Vercel. Todo el rediseño visual
 (fases 1-7) entró así.
 
+**Ojo con el filtro**: los tests viven dentro de esos mismos paquetes, así que
+el `--stat` puede salir con archivos aunque no cambie una línea de producción.
+En el deploy de las fases 17-19 aparecían tres archivos y sólo uno
+—`packages/core/src/gateway.ts`— era código real; los otros dos eran
+`*.test.ts`. Si todos los archivos listados son tests, el Worker no cambia.
+
+### Cuando SÍ se toca el servidor
+
+No hay forma de listar las salas activas: cada una es un Durable Object con
+identidad propia y `/health/room?code=XXXX` responde de a una. O sea que
+**verificar que la mesa esté vacía es una pregunta para el equipo**, no algo
+que se pueda comprobar con un comando.
+
+### Que responda 200 NO prueba que se haya desplegado
+
+Un deploy fallido deja el bundle anterior sirviendo con 200. La verificación
+real es buscar en el bundle de producción una cadena que sólo exista en el
+código nuevo:
+
+```bash
+curl -s "https://uno-delta-two.vercel.app" | grep -oE 'assets/[^"]+\.js' | head -1
+```
+
+Y después bajar ese archivo y buscar adentro. Conviene hacerlo **a un archivo
+en disco y con Python**, no con `grep` sobre una variable de shell: con acentos
+(`ÚLTIMA`, `CAMBIO DE SENTIDO`) zsh corta con `character not in range` y trunca
+la descarga, lo que parece un deploy roto sin serlo.
+
 ---
 
 ## Variables de entorno
