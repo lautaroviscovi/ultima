@@ -125,8 +125,10 @@ Decisiones de producto que se apartan del reglamento de Mattel:
   color activo y sin sistema de desafío, porque así juega el equipo.
   Consecuencia asumida: el +4 no tiene costo. El comando `CHALLENGE_WILD4` está
   reservado en el tipo para cuando se agregue el toggle en fase 2.
-- **Sin stacking de +2/+4** (esto sí es la regla oficial). El campo
-  `pendingDraw` ya existe en el estado para habilitarlo sin refactor.
+- **Con stacking de +2/+4, y libre**: un +2 se tapa con +4 y viceversa, sin
+  importar el color. Se acumula en `pendingDraw` y el objetivo tiene dos
+  salidas: taparlo o comerse la cadena entera. La regla oficial es SIN
+  stacking; se eligió jugarlo así.
 
 ## Casos borde cubiertos
 
@@ -139,7 +141,13 @@ Los que rompen las implementaciones de este juego, cada uno con test dedicado:
   consume del RNG.
 - **Reverse inicial** cambia _quién empieza_, no solo la dirección.
 - **Ganar con un +2**: el siguiente igual roba, y esas cartas cuentan para su
-  puntaje. El orden es `efecto → ÚLTIMA → fin de ronda → avanzar turno`.
+  puntaje. El orden es `efecto → ÚLTIMA → fin de ronda → avanzar turno`. Es la
+  única excepción al stacking: con la ronda cerrada no hay turno donde
+  responder, así que el castigo se cobra ahí mismo.
+- **Timeout con un castigo encima**: se roba el acumulado, no una carta. Si no,
+  dejar vencer el reloj sería la forma barata de esquivar un +8.
+- **Abandonar con un castigo encima**: el pendiente se limpia. El siguiente no
+  tuvo nada que ver con ese duelo.
 - **Ganar con un wild**: no se le pide el color a quien ya ganó.
 - **Reshuffle** con descarte de ≤1 carta: no roba y pasa, sin lanzar. Los wilds
   vuelven sin color asignado, o el reshuffle filtraría información.
