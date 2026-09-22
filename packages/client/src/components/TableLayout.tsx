@@ -21,6 +21,8 @@ export interface TableLayoutProps {
   drawPileCount: number;
   direction: 1 | -1;
   turnProgress?: number;
+  /** Segundos restantes del turno actual. Lo muestra el asiento activo. */
+  secondsLeft?: number;
   isMyTurn?: boolean;
   unoWindowFor?: string | null;
   reverseFlash?: boolean;
@@ -45,6 +47,7 @@ export function TableLayout({
   drawPileCount,
   direction,
   turnProgress = 1,
+  secondsLeft,
   isMyTurn = false,
   unoWindowFor = null,
   reverseFlash = false,
@@ -88,6 +91,7 @@ export function TableLayout({
                     player={player}
                     isCurrent={player.id === currentPlayerId}
                     turnProgress={turnProgress}
+                    {...(secondsLeft !== undefined ? { secondsLeft } : {})}
                     variant={variant}
                     canCallOut={unoWindowFor === player.id}
                   />

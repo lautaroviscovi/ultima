@@ -35,6 +35,7 @@ import { ColorPicker } from '../components/ColorPicker.js';
 import { ConnectionBadge } from '../components/ConnectionBadge.js';
 import { ErrorToast } from '../components/ErrorToast.js';
 import { EventLog } from '../components/EventLog.js';
+import { HudButton } from '../components/HudButton.js';
 import { RoundOverlay } from '../components/RoundOverlay.js';
 import { MIN_WIDTH, TableLayout } from '../components/TableLayout.js';
 import { DrawFlightLayer } from '../components/DrawFlight.js';
@@ -206,47 +207,45 @@ export function Table(): JSX.Element {
             />
           )}
         </AnimatePresence>
-        <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
+        {/*
+          Identidad de la sala a la izquierda, controles a la derecha, los dos
+          en una superficie propia.
+
+          Antes eran dos grupos de pildoras sueltas flotando sobre el fieltro,
+          y los cuatro botones compartian la clase EXACTA — o sea que "salir",
+          la accion destructiva, se veia igual que los toggles.
+        */}
+        <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full bg-scrim px-2 py-1 backdrop-blur-sm">
           <ConnectionBadge status={connection} />
-          <span className="rounded-full bg-sunken px-3 py-1 font-display text-mini tracking-wider text-white/60">
+          <span className="pr-1 font-display text-mini tracking-[0.15em] text-white/50">
             {roomId}
           </span>
-          {isMyTurn && timer.secondsLeft <= 15 && (
-            <span
-              className={`rounded-full px-3 py-1 text-mini font-bold tabular-nums ${
-                timer.secondsLeft <= 5
-                  ? 'bg-intent-urgent text-white'
-                  : 'bg-intent-warn text-brand-ink'
-              }`}
-            >
-              {timer.secondsLeft}s
-            </span>
-          )}
         </div>
 
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-2">
-          <button
+        <div className="absolute right-4 top-4 z-20 flex items-center gap-1 rounded-full bg-scrim p-1 backdrop-blur-sm">
+          <HudButton
             onClick={() =>
               setSortMode(sortMode === 'draw' ? 'color' : sortMode === 'color' ? 'value' : 'draw')
             }
-            className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
+            title="Cambiar el orden de tu mano"
           >
-            orden: {sortMode === 'draw' ? 'robo' : sortMode === 'color' ? 'color' : 'valor'}
-          </button>
-          <button
+            {sortMode === 'draw' ? 'por robo' : sortMode === 'color' ? 'por color' : 'por valor'}
+          </HudButton>
+
+          <HudButton
             onClick={toggleSound}
-            aria-pressed={soundEnabled}
+            pressed={soundEnabled}
             title={soundEnabled ? 'Silenciar' : 'Activar sonido'}
-            className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
           >
             {soundEnabled ? 'sonido' : 'silencio'}
-          </button>
-          <button
-            onClick={handleLeave}
-            className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
-          >
+          </HudButton>
+
+          {/* Separador: lo que sigue NO es un toggle. */}
+          <span className="mx-0.5 h-4 w-px bg-white/15" aria-hidden />
+
+          <HudButton onClick={handleLeave} danger title="Salir de la partida">
             salir
-          </button>
+          </HudButton>
         </div>
 
         <TableLayout
@@ -261,6 +260,7 @@ export function Table(): JSX.Element {
           drawPileCount={state.drawPileCount}
           direction={state.direction}
           turnProgress={timer.progress}
+          secondsLeft={timer.secondsLeft}
           isMyTurn={isMyTurn}
           unoWindowFor={unoWindowFor}
           reverseFlash={reverseFlash}

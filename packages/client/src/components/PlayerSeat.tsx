@@ -9,6 +9,8 @@ export interface PlayerSeatProps {
   isCurrent?: boolean;
   /** Fraccion restante del turno, 0..1. Alimenta el anillo de progreso. */
   turnProgress?: number;
+  /** Segundos que quedan. Solo se muestra en el asiento en turno. */
+  secondsLeft?: number;
   variant?: 'full' | 'compact';
   /**
    * Abierta la ventana para acusarle el ÚLTIMA no cantado.
@@ -40,6 +42,7 @@ export function PlayerSeat({
   player,
   isCurrent = false,
   turnProgress = 1,
+  secondsLeft,
   variant = 'full',
   canCallOut = false,
 }: PlayerSeatProps): JSX.Element {
@@ -58,17 +61,40 @@ export function PlayerSeat({
 
   return (
     <motion.div
-      // El movimiento del indicador de un asiento a otro ES en si mismo la
-      // señal de que cambio el turno: mas efectivo que cualquier estado
-      // estatico con 10 asientos en pantalla.
+      /**
+       * DOS señales, no seis.
+       *
+       * El asiento acumulaba escala + opacidad + fondo + sombra + anillo +
+       * color del nombre, todas a la vez. Seis señales simultaneas no son seis
+       * veces mas claras: compiten entre si y el ojo no sabe donde mirar.
+       *
+       * Quedan las dos que funcionan a distancia en una mesa de 10: la escala
+       * (que algo CRECE se ve por el rabillo del ojo) y el anillo de progreso,
+       * que ademas lleva el tiempo. El resto es ruido.
+       */
       animate={{
-        scale: isCurrent ? 1.1 : 1,
-        opacity: player.abandoned ? 0.3 : isCurrent ? 1 : 0.8,
+        scale: isCurrent ? 1.08 : 1,
+        opacity: player.abandoned ? 0.3 : 1,
       }}
       transition={SPRING.settle}
       className={`relative flex w-[7.5rem] flex-col items-center rounded-xl px-2 py-1.5
-                  ${isCurrent ? 'bg-raised-hover shadow-lg shadow-black/40' : 'bg-sunken'}`}
+                  ${isCurrent ? 'bg-raised-hover' : 'bg-sunken'}`}
     >
+      {/*
+        El foco del turno: UN solo nodo que viaja entre asientos.
+
+        `layoutId` compartido hace que Framer lo mueva de un asiento al otro en
+        vez de que cada uno aparezca y desaparezca por su cuenta. Es lo que
+        convierte "leer quien tiene el turno" en "ver que el turno se movio".
+      */}
+      {isCurrent && (
+        <motion.span
+          layoutId="turn-focus"
+          aria-hidden
+          className="pointer-events-none absolute -inset-1 rounded-xl ring-2 ring-brand-accent"
+          transition={SPRING.travel}
+        />
+      )}
       {/* Anillo de progreso: turno y urgencia en un solo elemento. */}
       {isCurrent && (
         <svg className="absolute -inset-1 h-[calc(100%+0.5rem)] w-[calc(100%+0.5rem)]" aria-hidden>
@@ -96,6 +122,22 @@ export function PlayerSeat({
         Va el MISMO componente que el lobby y la tabla de puntajes: el color de
         una persona no puede cambiar entre pantallas.
       */}
+      {/*
+        El tiempo, junto a quien juega.
+
+        Vivia en el HUD, arriba a la izquierda — lejos de la mano Y del asiento
+        activo. El tiempo pertenece a quien tiene el turno, asi que va con el.
+      */}
+      {isCurrent && secondsLeft !== undefined && secondsLeft <= 15 && (
+        <span
+          className={`absolute -top-2 right-1 rounded-full px-1.5 text-micro font-bold tabular-nums ${
+            secondsLeft <= 5 ? 'bg-intent-urgent text-white' : 'bg-intent-warn text-brand-ink'
+          }`}
+        >
+          {secondsLeft}s
+        </span>
+      )}
+
       <div className="flex w-full items-center gap-1">
         <PlayerAvatar
           nickname={player.nickname}
