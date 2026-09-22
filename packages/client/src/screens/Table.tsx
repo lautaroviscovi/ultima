@@ -31,6 +31,7 @@ import { useGameMoments } from '../hooks/useGameMoments.js';
 import { useFitsTable } from '../hooks/useFitsTable.js';
 import { useReducedMotion } from '../hooks/useReducedMotion.js';
 import { unlockAudio } from '../net/sound.js';
+import { primeVoice, stopVoice } from '../net/voice.js';
 import { ColorPicker } from '../components/ColorPicker.js';
 import { ConnectionBadge } from '../components/ConnectionBadge.js';
 import { ErrorToast } from '../components/ErrorToast.js';
@@ -60,6 +61,8 @@ export function Table(): JSX.Element {
   const reducedMotion = useReducedMotion();
   const soundEnabled = useUIStore((s) => s.soundEnabled);
   const toggleSound = useUIStore((s) => s.toggleSound);
+  const voiceEnabled = useUIStore((s) => s.voiceEnabled);
+  const toggleVoice = useUIStore((s) => s.toggleVoice);
   const [sortMode, setSortMode] = useSortMode();
   useGameSounds();
   const { flights, penalty, roundScore } = useGameMoments();
@@ -93,9 +96,18 @@ export function Table(): JSX.Element {
   // Los navegadores bloquean el audio hasta que hay un gesto del usuario: lo
   // desbloqueamos en el primer click para que el tick de turno ya suene.
   useEffect(() => {
-    const unlock = (): void => unlockAudio();
+    const unlock = (): void => {
+      unlockAudio();
+      // Resolver la voz tarda hasta un segundo: se hace acá y no en medio de
+      // una jugada.
+      primeVoice();
+    };
     window.addEventListener('pointerdown', unlock, { once: true });
-    return () => window.removeEventListener('pointerdown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      // Al salir de la mesa no puede quedar una frase hablando sola.
+      stopVoice();
+    };
   }, []);
 
   /**
@@ -259,6 +271,18 @@ export function Table(): JSX.Element {
             className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
           >
             {soundEnabled ? 'sonido' : 'silencio'}
+          </button>
+          <button
+            onClick={() => {
+              toggleVoice();
+              // Si la estás apagando, callá lo que esté diciendo ahora.
+              if (voiceEnabled) stopVoice();
+            }}
+            aria-pressed={voiceEnabled}
+            title={voiceEnabled ? 'Silenciar la voz' : 'Activar la voz'}
+            className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
+          >
+            voz: {voiceEnabled ? 'sí' : 'no'}
           </button>
           <button
             onClick={handleLeave}

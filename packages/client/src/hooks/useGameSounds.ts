@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useGameStore } from '../stores/game.js';
 import { useUIStore } from '../stores/ui.js';
 import { playSound } from '../net/sound.js';
+import { speak } from '../net/voice.js';
 
 /**
  * Traduce eventos y cambios de turno a sonido.
@@ -18,8 +19,22 @@ export function useGameSounds(): void {
     let seen = useGameStore.getState().eventSeq;
 
     return useGameStore.subscribe((store) => {
-      const enabled = useUIStore.getState().soundEnabled;
+      const { soundEnabled: enabled, voiceEnabled } = useUIStore.getState();
       if (!enabled || !store.state) return;
+      const me = store.state.you.id;
+
+      /**
+       * Dice la linea, y si no hay voz utilizable cae al tono.
+       *
+       * El fallback NO es opcional: que haya una voz en español depende del
+       * sistema operativo, y quedarse mudo seria peor que el estado anterior.
+       */
+      const say = (
+        line: Parameters<typeof speak>[0],
+        fallback: Parameters<typeof playSound>[0],
+      ): void => {
+        if (!speak(line, voiceEnabled)) playSound(fallback, enabled);
+      };
 
       const myTurn = store.state.currentPlayerId === store.state.you.id;
       if (myTurn && !wasMyTurn.current) playSound('turn', enabled);
@@ -45,7 +60,10 @@ export function useGameSounds(): void {
              * mas fuerte.
              */
             if (event.count > 1) {
-              playSound('penalty', enabled);
+              // Cuatro cartas es el castigo mas grande del juego y merece
+              // decirse; el +2 se queda con el tono, que ya lo distingue.
+              if (event.playerId === me && event.count >= 4) say('draw4', 'penalty');
+              else playSound('penalty', enabled);
               for (let i = 1; i < Math.min(event.count, 4); i++) {
                 setTimeout(() => playSound('draw', enabled), i * 110);
               }
@@ -57,8 +75,27 @@ export function useGameSounds(): void {
             playSound('reverse', enabled);
             break;
           case 'UNO_DECLARED':
+            // Cantar ÚLTIMA es el momento con nombre propio del juego: si algo
+            // merece voz, es esto.
+            say('ultima', 'uno');
+            break;
           case 'UNO_PENALTY':
             playSound('uno', enabled);
+            break;
+
+          /**
+           * Los eventos que te pasan A VOS y hasta ahora eran mudos.
+           *
+           * `PLAYER_SKIPPED` y `PLAYER_TIMED_OUT` llevan `playerId` y llegan
+           * sin redactar, asi que el cliente puede distinguir "a mi" de "a
+           * otro" — que es la unica forma de que esto no sea ruido. No toca
+           * el servidor.
+           */
+          case 'PLAYER_SKIPPED':
+            if (event.playerId === me) say('skipped', 'penalty');
+            break;
+          case 'PLAYER_TIMED_OUT':
+            if (event.playerId === me) say('timeout', 'penalty');
             break;
           case 'ROUND_ENDED':
           case 'GAME_ENDED':
