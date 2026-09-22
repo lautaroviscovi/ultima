@@ -170,6 +170,38 @@ describe('useGameMoments', () => {
     expect(ids.filter((id) => id === 'viejo')).toHaveLength(1);
   });
 
+  describe('delta de la ronda', () => {
+    it('captura lo que sumó el ganador', () => {
+      const { result } = renderHook(() => useGameMoments());
+      expect(result.current.roundScore).toBeNull();
+
+      emit('me', [{ type: 'ROUND_ENDED', winnerId: 'rival', points: 24 }]);
+      expect(result.current.roundScore).toEqual({ winnerId: 'rival', points: 24 });
+    });
+
+    /**
+     * El delta vive en el evento y el overlay se monta despues, asi que si no
+     * se limpia al empezar la ronda siguiente, el jugador ve el "+N" de la
+     * ronda ANTERIOR sobre la tabla nueva.
+     */
+    it('EL BUG: una ronda nueva borra el delta viejo', () => {
+      const { result } = renderHook(() => useGameMoments());
+      emit('me', [{ type: 'ROUND_ENDED', winnerId: 'rival', points: 24 }]);
+      expect(result.current.roundScore?.points).toBe(24);
+
+      emit('me', [{ type: 'CARDS_DEALT', perPlayer: 7 }]);
+      expect(result.current.roundScore).toBeNull();
+    });
+
+    it('sobrevive a eventos intermedios', () => {
+      const { result } = renderHook(() => useGameMoments());
+      emit('me', [{ type: 'ROUND_ENDED', winnerId: 'me', points: 31 }]);
+      // Un patch cualquiera no deberia borrarlo.
+      emit('me', [{ type: 'TURN_CHANGED', playerId: 'me' }]);
+      expect(result.current.roundScore).toEqual({ winnerId: 'me', points: 31 });
+    });
+  });
+
   it('dos robos de la MISMA carta no colisionan de clave', () => {
     // Pasa tras un rebarajado: la carta vuelve al mazo y se roba otra vez.
     vi.useFakeTimers();

@@ -62,7 +62,7 @@ export function Table(): JSX.Element {
   const toggleSound = useUIStore((s) => s.toggleSound);
   const [sortMode, setSortMode] = useSortMode();
   useGameSounds();
-  const { flights, penalty } = useGameMoments();
+  const { flights, penalty, roundScore } = useGameMoments();
   const fitsTable = useFitsTable();
 
   const colorPickerOpen = useUIStore((s) => s.colorPickerOpen);
@@ -305,6 +305,7 @@ export function Table(): JSX.Element {
 
         <RoundOverlay
           state={state}
+          roundPoints={roundScore?.points ?? null}
           isHost={Boolean(isHost)}
           onNextRound={() => void nextRound()}
           onLeave={handleLeave}

@@ -38,28 +38,42 @@ export interface DrawFlight {
  * inventar nada, y para los demas jugadores simplemente no hay nada que animar
  * — que es justamente lo correcto: no deberias ver que roba el otro.
  */
-export function useGameMoments(): { flights: DrawFlight[]; penalty: number } {
+/** Lo que sumo el ganador en la ronda que acaba de cerrar. */
+export interface RoundScore {
+  winnerId: string;
+  points: number;
+}
+
+export function useGameMoments(): {
+  flights: DrawFlight[];
+  penalty: number;
+  roundScore: RoundScore | null;
+} {
   const [flights, setFlights] = useState<DrawFlight[]>([]);
   /** Cuantas cartas te acaban de imponer (+2/+4). 0 = ninguna. */
   const [penalty, setPenalty] = useState(0);
+  /**
+   * El puntaje de la ronda vive en el EVENTO `ROUND_ENDED`, no en el estado:
+   * el estado sólo guarda el acumulado. Sin capturarlo acá, la única forma de
+   * saber cuánto sumó la mano sería restar dos estados consecutivos, que es
+   * frágil y se pierde en una reconexión.
+   *
+   * OJO: en este juego **sólo el ganador suma**. `points` es lo que sumó él,
+   * no un reparto — el resto de la tabla sumó cero.
+   */
+  const [roundScore, setRoundScore] = useState<RoundScore | null>(null);
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
     /**
      * Hasta que numero de evento ya vimos.
      *
-     * NO se puede leer `store.events` y confiar en que este: `useEventLog` la
-     * vacia con `drainEvents()`, y si ese hook corre primero — depende del
-     * orden en que se llamen en el componente — este callback recibe una cola
-     * vacia y no anima nada.
-     *
-     * Eso fue un bug real y desconcertante: el SONIDO del robo se oia
-     * perfectamente (ese hook se registra antes que el log) pero la carta no
-     * volaba nunca. Medido en el navegador: las 10 notificaciones llegaban con
-     * `events.length === 0`.
+     * Hubo un momento en que `useEventLog` VACIABA la cola, y el que corriera
+     * despues no veia nada. El sintoma era desconcertante: el SONIDO del robo
+     * se oia perfectamente pero la carta no volaba nunca.
      *
      * `eventSeq` solo crece, asi que cada consumidor sabe que le falta sin
-     * depender del orden ni de quien vacie la cola.
+     * depender del orden en que se registren ni de que otro la lea antes.
      */
     let seen = useGameStore.getState().eventSeq;
 
@@ -80,6 +94,16 @@ export function useGameMoments(): { flights: DrawFlight[]; penalty: number } {
       const me = store.state.you.id;
 
       for (const event of fresh) {
+        if (event.type === 'ROUND_ENDED') {
+          setRoundScore({ winnerId: event.winnerId, points: event.points });
+          continue;
+        }
+        // Una ronda nueva borra el delta viejo: si quedara, el overlay de la
+        // ronda siguiente mostraria el "+N" de la anterior.
+        if (event.type === 'GAME_STARTED' || event.type === 'CARDS_DEALT') {
+          setRoundScore(null);
+          continue;
+        }
         if (event.type !== 'CARDS_DRAWN' || event.playerId !== me) continue;
 
         // Sin `cards` no hay nada que animar: es un robo ajeno, o un evento
@@ -124,7 +148,7 @@ export function useGameMoments(): { flights: DrawFlight[]; penalty: number } {
     };
   }, []);
 
-  return { flights, penalty };
+  return { flights, penalty, roundScore };
 }
 
 export const DRAW_FLIGHT_MS = FLIGHT_MS;
