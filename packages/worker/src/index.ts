@@ -6,6 +6,9 @@ export { RoomDurableObject };
 /** Cuantas veces reintentar si el codigo de sala ya estaba tomado. */
 const MAX_CLAIM_ATTEMPTS = 5;
 
+/** Alfabeto sin caracteres ambiguos: los codigos se dictan por voz. */
+const ROOM_CODE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4,6}$/;
+
 /**
  * IMPORTANTE: `idFromName("abcd")` y `idFromName("ABCD")` son Durable Objects
  * DISTINTOS. Si no se normaliza acá, dos jugadores con el mismo código en
@@ -62,6 +65,63 @@ export default {
     }
 
     /**
+     * Estado de UNA sala: /health/room?code=XXXX
+     *
+     * No hay listado global a proposito: con Durable Objects cada sala es un
+     * objeto independiente, sin registro central. Eso es lo que hace que el
+     * aislamiento entre salas sea una garantia de plataforma y no una
+     * convencion — pero significa que para mirar una sala hay que nombrarla.
+     */
+    if (url.pathname === '/health/room') {
+      const raw = url.searchParams.get('code');
+      if (!raw) return json({ ok: false, message: 'falta ?code=' }, { status: 400 }, cors);
+
+      const roomId = normalizeRoomId(raw);
+      if (!ROOM_CODE.test(roomId)) {
+        return json({ ok: false, message: 'codigo invalido' }, { status: 400 }, cors);
+      }
+
+      const stub = env.ROOM.get(env.ROOM.idFromName(roomId));
+      const status = await stub.status();
+      return json({ ok: true, roomId, status }, {}, cors);
+    }
+
+    /**
+     * Libera una sala: borra su estado y devuelve el codigo al pool.
+     *
+     * Es destructivo, asi que pide el header. No es una API para el cliente:
+     * el ciclo normal es que la sala venza por TTL. Esto es para limpiar a
+     * mano despues de probar.
+     */
+    if (url.pathname === '/admin/release' && request.method === 'POST') {
+      const raw = url.searchParams.get('code');
+      if (!raw) return json({ ok: false, message: 'falta ?code=' }, { status: 400 }, cors);
+
+      const roomId = normalizeRoomId(raw);
+      if (!ROOM_CODE.test(roomId)) {
+        return json({ ok: false, message: 'codigo invalido' }, { status: 400 }, cors);
+      }
+
+      const stub = env.ROOM.get(env.ROOM.idFromName(roomId));
+      const before = await stub.status();
+      // No cortamos una partida EN CURSO por accidente. Una terminada, si.
+      const enCurso = before && before.players > 0 && before.phase !== 'game_over';
+      if (enCurso) {
+        return json(
+          {
+            ok: false,
+            message: `la sala ${roomId} tiene una partida en curso con ${before.players} jugadores`,
+          },
+          { status: 409 },
+          cors,
+        );
+      }
+
+      await stub.release();
+      return json({ ok: true, roomId, released: before !== null }, {}, cors);
+    }
+
+    /**
      * Reserva un codigo de sala.
      *
      * No hay registro central: el DO es su propio guardian de unicidad. Se
@@ -90,7 +150,7 @@ export default {
       if (!raw) return new Response('falta el parametro room', { status: 400, headers: cors });
 
       const roomId = normalizeRoomId(raw);
-      if (!/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{4,6}$/.test(roomId)) {
+      if (!ROOM_CODE.test(roomId)) {
         return new Response('codigo de sala invalido', { status: 400, headers: cors });
       }
 

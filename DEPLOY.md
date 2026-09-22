@@ -89,6 +89,28 @@ Para mirar antes de desplegar:
 curl https://uno-server.viscovilautaro.workers.dev/health
 ```
 
+### Mirar o limpiar una sala
+
+No hay listado global a propósito: con Durable Objects cada sala es un objeto
+independiente, sin registro central. Eso hace que el aislamiento entre salas
+sea una garantía de plataforma y no una convención — pero significa que para
+mirar una sala hay que nombrarla.
+
+```bash
+curl "https://uno-server.viscovilautaro.workers.dev/health/room?code=XK4T"
+```
+
+Una sala vencida por TTL se limpia sola. Para forzarlo después de probar:
+
+```bash
+curl -X POST "https://uno-server.viscovilautaro.workers.dev/admin/release?code=XK4T"
+```
+
+Se niega con un 409 si hay una **partida en curso** (una terminada sí se
+libera). Esto también devuelve el código al pool: el flag `claimed` se persiste
+para que dos `/claim` no colisionen, así que sin liberarlo cada partida
+consumiría un código del espacio de ~920k para siempre.
+
 ### Logs
 
 ```bash

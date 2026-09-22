@@ -129,6 +129,45 @@ describe('ruteo a Durable Objects', () => {
   });
 });
 
+describe('salud de una sala', () => {
+  it('rechaza el endpoint sin codigo', async () => {
+    const res = await SELF.fetch('https://example.com/health/room');
+    expect(res.status).toBe(400);
+  });
+
+  it('rechaza un codigo invalido', async () => {
+    const res = await SELF.fetch('https://example.com/health/room?code=ab-1');
+    expect(res.status).toBe(400);
+  });
+
+  it('una sala nunca usada no tiene estado', async () => {
+    const res = await SELF.fetch('https://example.com/health/room?code=QQQQ');
+    const body = (await res.json()) as { ok: boolean; status: unknown };
+    expect(body.ok).toBe(true);
+    expect(body.status).toBeNull();
+  });
+
+  it('una sala reclamada aparece como tal', async () => {
+    const claim = await SELF.fetch('https://example.com/claim', { method: 'POST' });
+    const { roomId } = (await claim.json()) as { roomId: string };
+
+    const res = await SELF.fetch(`https://example.com/health/room?code=${roomId}`);
+    const body = (await res.json()) as { status: { claimed: boolean; players: number } };
+    expect(body.status.claimed).toBe(true);
+    expect(body.status.players).toBe(0);
+  });
+
+  it('normaliza el case tambien aca', async () => {
+    const claim = await SELF.fetch('https://example.com/claim', { method: 'POST' });
+    const { roomId } = (await claim.json()) as { roomId: string };
+
+    const res = await SELF.fetch(`https://example.com/health/room?code=${roomId.toLowerCase()}`);
+    const body = (await res.json()) as { roomId: string; status: { claimed: boolean } };
+    expect(body.roomId).toBe(roomId);
+    expect(body.status.claimed).toBe(true);
+  });
+});
+
 describe('reclamo de codigo', () => {
   it('un DO solo acepta UN claim: es su propio registro de unicidad', async () => {
     const id = env.ROOM.idFromName('ZZZZ');
@@ -137,5 +176,19 @@ describe('reclamo de codigo', () => {
     // El DO ES el registro: no hay estado compartido ni coordinacion.
     expect(await stub.claim('ZZZZ')).toBe(true);
     expect(await stub.claim('ZZZZ')).toBe(false);
+  });
+
+  it('release LIBERA el codigo para volver a usarlo', async () => {
+    /**
+     * Sin esto, cada partida jugada consume un codigo del espacio de ~920k
+     * para siempre: el flag `claimed` se persiste y nunca se borraba. Es una
+     * fuga lenta, pero es una fuga.
+     */
+    const stub = env.ROOM.get(env.ROOM.idFromName('YYYY'));
+    expect(await stub.claim('YYYY')).toBe(true);
+    expect(await stub.claim('YYYY')).toBe(false);
+
+    await stub.release();
+    expect(await stub.claim('YYYY')).toBe(true);
   });
 });

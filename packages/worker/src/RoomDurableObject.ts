@@ -193,6 +193,27 @@ export class RoomDurableObject extends DurableObject<Env> {
     return (await this.ctx.storage.get<boolean>('claimed')) === true;
   }
 
+  /** Estado de la sala, para el endpoint de salud. */
+  async status(): Promise<{ claimed: boolean; players: number; phase: string } | null> {
+    await this.ensureRestored();
+    const room = this.roomId ? this.rooms.find(this.roomId) : undefined;
+    const claimed = (await this.ctx.storage.get<boolean>('claimed')) === true;
+    if (!claimed && !room) return null;
+    return {
+      claimed,
+      players: room?.seats.length ?? 0,
+      phase: room?.game?.phase ?? 'lobby',
+    };
+  }
+
+  /** Libera el codigo y borra todo el estado de esta sala. */
+  async release(): Promise<void> {
+    await this.ctx.storage.deleteAll();
+    this.rooms.removeRoom(this.roomId ?? '');
+    this.roomId = null;
+    this.restored = false;
+  }
+
   /**
    * Rehidrata desde storage la PRIMERA vez que esta instancia necesita la sala.
    *
@@ -336,6 +357,16 @@ export class RoomDurableObject extends DurableObject<Env> {
       if (effect.kind === 'state:patch' && room) {
         this.gateway.broadcastState(room, effect.events);
         this.gateway.broadcastRoom(room);
+      }
+      if (effect.kind === 'room:closed') {
+        /**
+         * La sala vencio por TTL. Hay que liberar el codigo, no solo el
+         * estado: el flag `claimed` se persiste para que dos /claim del mismo
+         * codigo no colisionen, pero si nunca se borra cada partida consume un
+         * codigo del espacio de ~920k para siempre.
+         */
+        await this.release();
+        return;
       }
     }
 
