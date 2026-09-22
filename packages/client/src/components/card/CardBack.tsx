@@ -69,7 +69,7 @@ export function CardBack({
           letterSpacing="0.5"
           style={{ fontFamily: 'Outfit Variable, Outfit Fallback, system-ui, sans-serif' }}
         >
-          ULTIMA
+          ÚLTIMA
         </text>
       </svg>
     </div>

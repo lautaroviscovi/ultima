@@ -10,9 +10,13 @@ export interface PlayerSeatProps {
   /** Fraccion restante del turno, 0..1. Alimenta el anillo de progreso. */
   turnProgress?: number;
   variant?: 'full' | 'compact';
-  /** Abierta la ventana para acusarle el UNO no declarado. */
+  /**
+   * Abierta la ventana para acusarle el ÚLTIMA no cantado.
+   *
+   * Solo SEÑALA: el boton vive en la barra de mano. Por eso ya no recibe
+   * `onCallOut` — el asiento dejo de ser accionable.
+   */
   canCallOut?: boolean;
-  onCallOut?: (playerId: string) => void;
 }
 
 /** Hasta 7 dorsos: la longitud del abanico se lee sin contar numeros. */
@@ -38,7 +42,6 @@ export function PlayerSeat({
   turnProgress = 1,
   variant = 'full',
   canCallOut = false,
-  onCallOut,
 }: PlayerSeatProps): JSX.Element {
   const compact = variant === 'compact';
   const unoUndeclared = player.cardCount === 1 && !player.hasDeclaredUno;
@@ -183,21 +186,23 @@ export function PlayerSeat({
       {status && <span className="text-micro text-white/50">{status}</span>}
 
       {/*
-        La acusacion es un click sobre el jugador, que es donde tu atencion ya
-        esta. Con 10 asientos, un boton en otro lado no se encuentra a tiempo.
+        El asiento SEÑALA que a este jugador se le puede acusar, pero el boton
+        vive en la barra de mano (`HandActions`).
+
+        Antes el boton era este overlay, y era la peor ubicacion posible: tu
+        atencion esta en tu mano —abajo— y la ventana para acusar dura
+        segundos. Mirar arriba, encontrar el asiento y hacer click no entra en
+        ese tiempo.
+
+        La señal se queda: es donde mirás para saber A QUIEN.
       */}
       {canCallOut && unoUndeclared && (
-        <button
-          type="button"
-          onClick={() => onCallOut?.(player.id)}
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-0.5
-                     rounded-xl bg-intent-urgent text-mini font-black leading-none animate-pulse"
-        >
-          {/* Opaco, no semitransparente: con el nombre translucido detras el
-              texto no se lee y el boton no se reconoce como accionable. */}
-          <span className="text-micro font-normal opacity-90">{player.nickname}</span>
-          <span>¡No dijo ÚLTIMA!</span>
-        </button>
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute -inset-1 rounded-xl ring-2 ring-intent-urgent"
+          animate={{ opacity: [0.35, 1, 0.35] }}
+          transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+        />
       )}
     </motion.div>
   );

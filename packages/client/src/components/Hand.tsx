@@ -4,6 +4,8 @@ import { Card, CARD_WIDTH_PX } from './Card.js';
 export interface HandProps {
   cards: CardModel[];
   playable?: Set<CardId>;
+  /** Si es tu turno: cambia como se ven las cartas que no podes jugar. */
+  myTurn?: boolean;
   inFlight?: Set<CardId>;
   onPlay?: (card: CardModel) => void;
   /** Ancho disponible en px. Solo para tests: en runtime lo da el contenedor. */
@@ -47,6 +49,7 @@ export function overlapFor(count: number, availableWidth: number): number {
 export function Hand({
   cards,
   playable,
+  myTurn = false,
   inFlight,
   onPlay,
   availableWidth,
@@ -68,6 +71,7 @@ export function Hand({
             card={card}
             size="lg"
             playable={playable?.has(card.id) ?? false}
+            myTurn={myTurn}
             inFlight={inFlight?.has(card.id) ?? false}
             {...(onPlay ? { onClick: onPlay } : {})}
           />

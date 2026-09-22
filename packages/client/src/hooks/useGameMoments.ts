@@ -99,7 +99,7 @@ export function useGameMoments(): {
       if (store.eventSeq === seen || !store.state) return;
 
       /**
-       * Los eventos que entraron desde la ultima vez.
+       * Los eventos que entraron desde la última vez.
        *
        * El `Math.max(0, ...)` no es defensivo por las dudas: tras un
        * `state:sync` la cola se vacia pero `eventSeq` sigue, asi que `pending`

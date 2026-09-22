@@ -19,7 +19,7 @@ export interface SessionState {
   remember(roomId: string, playerToken: string, playerId: string): void;
   forget(roomId: string): void;
   sessionFor(roomId: string): { playerToken: string; playerId: string } | undefined;
-  /** La ultima sala con sesion guardada, para ofrecer "volver a tu partida". */
+  /** La última sala con sesión guardada, para ofrecer "volver a tu partida". */
   lastRoomId(): string | undefined;
 }
 

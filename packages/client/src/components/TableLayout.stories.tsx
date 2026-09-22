@@ -38,6 +38,13 @@ function propsFor(playerCount: number, overrides: Parameters<typeof makeRedacted
     direction: state.direction,
     turnProgress: 0.7,
     isMyTurn: state.currentPlayerId === state.you.id,
+    /**
+     * `onPlay` no es decorativo en las stories: `Card` solo trata una carta
+     * como accionable si recibe un handler, y de eso depende que se vean los
+     * estados de jugable/invalida. Sin esto, las stories muestran una mano
+     * inerte que no se parece a la del juego.
+     */
+    onPlay: () => {},
   };
 }
 
@@ -70,8 +77,25 @@ export const TodosLosLayouts: Story = {
 };
 
 /** No es tu turno: el marco inferior se apaga y las cartas se atenuan. */
+/**
+ * Fuera de turno la mano queda NEUTRA, no apagada.
+ *
+ * Antes se veia igual que una carta invalida en tu turno: `playable` es un set
+ * vacio fuera de turno, asi que todas quedaban atenuadas. El gris no informaba
+ * nada — comparar con `TuTurnoConInvalidas`.
+ */
 export const NoEsTuTurno: Story = {
   args: { ...propsFor(10, { currentSeat: 3 }), isMyTurn: false, playable: new Set<string>() },
+};
+
+/**
+ * En TU turno, con cartas que no se pueden jugar.
+ *
+ * Aca el gris SI informa: dice "esta no". Las dos o tres jugables se levantan
+ * y el resto se apaga de verdad, que es la diferencia con la story de arriba.
+ */
+export const TuTurnoConInvalidas: Story = {
+  args: { ...propsFor(10, { currentSeat: 0 }), isMyTurn: true },
 };
 
 /** El color activo difiere del tope: el halo es lo unico que lo comunica. */

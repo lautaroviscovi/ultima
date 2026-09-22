@@ -1,6 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
 import type { Card as CardModel, CardId, Color, RedactedPlayer } from '@uno/engine';
 import { DirectionIndicator } from './DirectionIndicator.js';
+import { HandActions } from './HandActions.js';
 import { DiscardPile } from './DiscardPile.js';
 import { Hand } from './Hand.js';
 import { PlayerSeat } from './PlayerSeat.js';
@@ -56,6 +57,15 @@ export function TableLayout({
   const variant = seatVariant(opponents.length);
   const aboutToWin = hand.length === 2;
 
+  /**
+   * A quien se le puede acusar, con su nombre.
+   *
+   * El asiento sigue resaltandose —es donde mirás para saber a quién— pero el
+   * BOTON baja a la mano. La ventana dura segundos y tu atencion esta abajo.
+   */
+  const accused = opponents.find((p) => p.id === unoWindowFor && p.cardCount === 1);
+  const callOut = accused ? { playerId: accused.id, nickname: accused.nickname } : null;
+
   return (
     <LayoutGroup>
       <div className="flex h-full min-h-screen flex-col bg-felt-dark bg-felt">
@@ -80,7 +90,6 @@ export function TableLayout({
                     turnProgress={turnProgress}
                     variant={variant}
                     canCallOut={unoWindowFor === player.id}
-                    {...(onCallOut ? { onCallOut } : {})}
                   />
                 </motion.div>
               );
@@ -114,9 +123,18 @@ export function TableLayout({
               atencion esta partida y no se puede asumir que miren la mesa. */}
           {isMyTurn && <div className="pointer-events-none absolute inset-0 shadow-glow-inset" />}
 
-          <div className="flex items-center justify-between px-6 pt-2">
+          {/*
+            El conteo va al costado y las ACCIONES al centro, sobre las cartas.
+
+            Antes esta fila usaba `justify-between`, que con un minimo de
+            1100px dejaba el boton pegado al borde derecho mientras la mano
+            esta centrada: cientos de pixeles entre la accion y las cartas.
+          */}
+          <div className="relative flex items-center justify-center px-6 pt-2">
             <span
-              className={`text-body font-bold ${isMyTurn ? 'text-brand-accent' : 'text-white/50'}`}
+              className={`absolute left-6 text-body font-bold ${
+                isMyTurn ? 'text-brand-accent' : 'text-white/50'
+              }`}
             >
               {isMyTurn ? 'Te toca' : 'Tu mano'}
               <span className="ml-2 font-normal text-white/50">
@@ -124,25 +142,17 @@ export function TableLayout({
               </span>
             </span>
 
-            {/* El boton se ilumina ANTES de quedar en una: declarar junto con la
-                jugada elimina la carrera de red que arruina la experiencia. */}
-            <button
-              type="button"
-              onClick={onDeclareUno}
-              disabled={!aboutToWin}
-              className={`rounded-full px-5 py-1.5 font-display text-body font-black transition-all
-                          ${
-                            aboutToWin
-                              ? 'bg-brand-accent text-brand-ink animate-pulse'
-                              : 'bg-raised text-white/30'
-                          }`}
-            >
-              ¡ÚLTIMA!
-            </button>
+            <HandActions
+              aboutToWin={aboutToWin}
+              {...(onDeclareUno ? { onDeclareUno } : {})}
+              {...(callOut ? { callOut } : {})}
+              {...(onCallOut ? { onCallOut } : {})}
+            />
           </div>
 
           <Hand
             cards={hand}
+            myTurn={isMyTurn}
             {...(playable ? { playable } : {})}
             {...(inFlight ? { inFlight } : {})}
             {...(onPlay ? { onPlay } : {})}

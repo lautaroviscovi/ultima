@@ -12,6 +12,15 @@ export interface CardProps {
   /** Dorso: para las manos ajenas y el mazo. Nunca revela la cara. */
   faceDown?: boolean;
   playable?: boolean;
+  /**
+   * Si es TU turno.
+   *
+   * Sin esto la carta no puede distinguir dos situaciones muy distintas que
+   * antes se veian igual: "no es tu momento" y "esta carta no sirve". Fuera de
+   * turno `playable` es false para TODAS, asi que la mano entera quedaba
+   * atenuada aunque no hubiera nada mal.
+   */
+  myTurn?: boolean;
   /** Volando hacia el descarte (optimismo visual). */
   inFlight?: boolean;
   size?: CardSize;
@@ -176,6 +185,7 @@ export function Card({
   card,
   faceDown = false,
   playable = false,
+  myTurn = false,
   inFlight = false,
   size = 'md',
   onClick,
@@ -190,6 +200,11 @@ export function Card({
 
   const colored = 'color' in card;
   const interactive = Boolean(onClick);
+  /**
+   * Gris SOLO en turno: ahi "no jugable" es informacion util. Fuera de turno
+   * ninguna carta es jugable y atenuarlas seria ruido.
+   */
+  const dimmed = interactive && myTurn && !playable;
 
   return (
     <motion.button
@@ -200,25 +215,32 @@ export function Card({
       disabled={!interactive || !playable}
       onClick={() => onClick?.(card)}
       aria-label={cardAria(card)}
-      {...(playable ? { whileHover: { y: -14 }, whileTap: { scale: 0.96 } } : {})}
+      {...(playable ? { whileHover: { y: -22 }, whileTap: { scale: 0.96 } } : {})}
       /**
-       * La jugable se ELEVA en reposo, no solo al hover.
+       * TRES estados, no dos. Y el tercero es el que faltaba.
        *
-       * Antes la no jugable se apagaba con `opacity-45 saturate-50`, y con 15
-       * cartas en mano eso deja tu mano mayormente muerta — justo cuando mas
-       * necesitas planear con las cartas que TODAVIA no podes jugar.
+       * | Situacion            | Como se ve                                  |
+       * | -------------------- | ------------------------------------------- |
+       * | Fuera de turno       | En reposo, NEUTRA. No hay nada mal          |
+       * | En turno, jugable    | Elevada y con acento de marca               |
+       * | En turno, invalida   | Gris de verdad: aca el gris SI dice "esta no" |
        *
-       * Invertido: la no jugable sigue legible y la jugable se despega. Con el
-       * abanico solapado la diferencia de ALTURA es la señal mas fuerte que
-       * hay, porque se lee sin hover y todas juntas de un vistazo.
+       * Antes faltaba la primera: fuera de turno `playable` es false para
+       * todas, asi que la mano entera se veia igual de apagada que una carta
+       * invalida en tu turno. El gris no informaba nada — y por eso molestaba.
+       *
+       * Apagar esta bien CUANDO el gris informa. Ese es el matiz que corrige
+       * la decision de la fase 3, que habia subido la opacidad para todos.
        */
-      animate={{ y: playable ? -6 : 0, opacity: inFlight ? 0 : 1 }}
+      animate={{ y: playable ? -12 : 0, opacity: inFlight ? 0 : 1 }}
       transition={SPRING.snap}
       className={`${box} shrink-0 relative flex items-center justify-center overflow-hidden
                   rounded-[var(--card-radius)] border-2 border-white shadow-card
+                  transition-[opacity,filter] duration-200
                   ${colored ? BG[card.color] : 'bg-overlay'}
-                  ${playable ? 'cursor-pointer shadow-card-lift ring-2 ring-brand-accent/40' : ''}
-                  ${!playable && interactive ? 'opacity-[0.78] saturate-[0.85] cursor-not-allowed' : ''}`}
+                  ${playable ? 'cursor-pointer shadow-card-lift ring-2 ring-brand-accent/70' : ''}
+                  ${dimmed ? 'opacity-40 saturate-[0.35] cursor-not-allowed' : ''}
+                  ${!playable && !dimmed && interactive ? 'cursor-not-allowed' : ''}`}
     >
       {colored && <CardOval className="absolute inset-0 h-full w-full" />}
 
