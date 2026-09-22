@@ -77,8 +77,22 @@ export function PlayerSeat({
         opacity: player.abandoned ? 0.3 : 1,
       }}
       transition={SPRING.settle}
-      className={`relative flex w-[7.5rem] flex-col items-center rounded-xl px-2 py-1.5
-                  ${isCurrent ? 'bg-raised-hover' : 'bg-sunken'}`}
+      /*
+        Una PERSONA sentada, no un chip de UI.
+      
+        Antes era `w-[7.5rem]` + `rounded-xl` + `bg-sunken`: un rectangulo
+        opaco con texto adentro, que es exactamente la forma de una etiqueta.
+        Con diez de esos alrededor, la mesa se leia como un tablero de
+        controles.
+      
+        Ahora la placa es una PASTILLA (`rounded-full`) apenas translucida que
+        envuelve al avatar y al nombre — la forma de un jugador en una mesa,
+        no de un boton. El fondo baja a /25 para que se vea el fieltro por
+        debajo: la gente esta SOBRE la mesa, no tapandola.
+      */
+      className={`relative flex w-[7.5rem] flex-col items-center rounded-[1.75rem] px-2 py-1.5
+                  backdrop-blur-[2px] transition-colors
+                  ${isCurrent ? 'bg-black/40 ring-1 ring-white/15' : 'bg-black/25'}`}
     >
       {/*
         El foco del turno: UN solo nodo que viaja entre asientos.
@@ -91,7 +105,7 @@ export function PlayerSeat({
         <motion.span
           layoutId="turn-focus"
           aria-hidden
-          className="pointer-events-none absolute -inset-1 rounded-xl ring-2 ring-brand-accent"
+          className="pointer-events-none absolute -inset-1 rounded-[2rem] ring-2 ring-brand-accent"
           transition={SPRING.travel}
         />
       )}
@@ -103,7 +117,7 @@ export function PlayerSeat({
             y="1"
             width="calc(100% - 2px)"
             height="calc(100% - 2px)"
-            rx="14"
+            rx="30"
             fill="none"
             strokeWidth="2"
             pathLength={1}
@@ -139,10 +153,16 @@ export function PlayerSeat({
       )}
 
       <div className="flex w-full items-center gap-1">
+        {/*
+          El avatar manda. Con `size="sm"` competia de igual a igual con el
+          nombre truncado, y el resultado era que no ganaba ninguno: habia que
+          leer para identificar a alguien. Mas grande, el color se reconoce de
+          un vistazo y el nombre pasa a ser confirmacion, no busqueda.
+        */}
         <PlayerAvatar
           nickname={player.nickname}
           seat={player.seat}
-          size="sm"
+          size="md"
           dimmed={player.abandoned || !player.connected}
         />
         {declaredUno ? (
@@ -241,7 +261,7 @@ export function PlayerSeat({
       {canCallOut && unoUndeclared && (
         <motion.span
           aria-hidden
-          className="pointer-events-none absolute -inset-1 rounded-xl ring-2 ring-intent-urgent"
+          className="pointer-events-none absolute -inset-1 rounded-[2rem] ring-2 ring-intent-urgent"
           animate={{ opacity: [0.35, 1, 0.35] }}
           transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
         />

@@ -55,6 +55,24 @@
   --felt-dark: 11 58 32;
 
   /**
+   * El pano iluminado y el canto de la mesa.
+   *
+   * Existen desde que la mesa es un OBJETO dibujado (`TableSurface`) y no un
+   * color de fondo. `--felt-lit` es el centro bajo la lampara; `--felt-rail`
+   * es la madera del borde, que es lo que hace que el ovalo tenga canto en vez
+   * de ser una mancha verde mas clara.
+   *
+   * El rail es calido pero DESATURADO. Un marron saturado (62 39 23) contra el
+   * verde se leia como una linea bordo alrededor del ovalo, no como madera:
+   * los complementarios se exageran mutuamente. Bajarle el croma lo devuelve a
+   * ser material.
+   */
+  --felt-lit: 27 104 57;
+  --felt-rail: 48 38 30;
+  --felt-rail-lit: 74 60 47;
+  --felt-rail-dark: 26 20 16;
+
+  /**
    * La superficie de la mesa.
    *
    * Un radial de `--felt` en el centro a `--felt-dark` en los bordes: la mesa

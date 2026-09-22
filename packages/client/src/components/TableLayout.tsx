@@ -6,6 +6,7 @@ import { DiscardPile } from './DiscardPile.js';
 import { Hand } from './Hand.js';
 import { PlayerSeat } from './PlayerSeat.js';
 import { AnnouncementLayer, type Announcement } from './Announcement.js';
+import { TableSurface } from './TableSurface.js';
 import { seatPositions, seatVariant } from './seats.js';
 
 export interface TableLayoutProps {
@@ -74,45 +75,94 @@ export function TableLayout({
 
   return (
     <LayoutGroup>
-      <div className="flex h-full min-h-screen flex-col bg-felt-dark bg-felt">
+      <div className="flex h-full min-h-screen flex-col bg-felt-dark">
         {/* Mesa: los oponentes en el arco, el mazo y el descarte al centro. */}
-        <div className="relative flex-1">
-          <AnimatePresence>
-            {opponents.map((player, i) => {
-              const pos = positions[i];
-              if (!pos) return null;
-              return (
-                <motion.div
-                  key={player.id}
-                  layout
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                  animate={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                  transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-                  style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                >
-                  <PlayerSeat
-                    player={player}
-                    isCurrent={player.id === currentPlayerId}
-                    turnProgress={turnProgress}
-                    {...(secondsLeft !== undefined ? { secondsLeft } : {})}
-                    variant={variant}
-                    canCallOut={unoWindowFor === player.id}
-                  />
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+        {/*
+          El area del arco NO ocupa toda la pantalla.
 
-          <div className="absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2">
-            <div className="flex flex-col items-center gap-2">
-              <DirectionIndicator direction={direction} flash={announcement?.kind === 'reverse'} />
-              <DiscardPile
-                top={discardTop}
-                activeColor={activeColor}
-                drawPileCount={drawPileCount}
-                canDraw={isMyTurn}
-                {...(onDraw ? { onDraw } : {})}
-              />
+          `seats.ts` posiciona en porcentajes del contenedor, asi que achicar
+          este div achica la mesa ENTERA —pano y asientos juntos— sin tocar una
+          sola constante de la geometria.
+
+          Hace falta porque una mesa que llega a los cuatro bordes vuelve a
+          leerse como fondo: para que se lea como un OBJETO tiene que haber
+          piso visible alrededor. El padding lateral es mayor que el vertical
+          porque el arco es ancho y bajo.
+        */}
+        <div className="relative flex-1">
+          {/*
+            `absolute inset-…` y no padding sobre el flex.
+
+            Con padding sobre el contenedor flex, el hijo interior no resolvia
+            su altura —`h-full` dentro de un flex sin alto explicito colapsa— y
+            los porcentajes de `seats.ts` se calculaban contra casi cero: los
+            diez asientos se apilaban arriba, superpuestos.
+
+            Posicionado absoluto contra el padre relative, el area tiene alto
+            real y los porcentajes vuelven a significar lo que dicen.
+          */}
+          <div className="absolute inset-x-[6%] inset-y-[2%]">
+            {/*
+              La mesa se dibuja ANTES que todo lo demas: es la superficie sobre
+              la que se apoyan los asientos y el centro, no una capa encima.
+            */}
+            <TableSurface />
+
+            <AnimatePresence>
+              {opponents.map((player, i) => {
+                const pos = positions[i];
+                if (!pos) return null;
+                return (
+                  <motion.div
+                    key={player.id}
+                    layout
+                    className="absolute -translate-x-1/2 -translate-y-1/2"
+                    animate={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+                    style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                  >
+                    <PlayerSeat
+                      player={player}
+                      isCurrent={player.id === currentPlayerId}
+                      turnProgress={turnProgress}
+                      {...(secondsLeft !== undefined ? { secondsLeft } : {})}
+                      variant={variant}
+                      canCallOut={unoWindowFor === player.id}
+                    />
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+
+            {/*
+            El centro va en el centro EXACTO del ovalo (45%, el mismo
+            `TABLE_CENTER_Y` que usan los asientos y la superficie), y se apoya
+            en una zona marcada del pano.
+
+            Sin la zona, el mazo y el descarte eran dos cartas flotando en un
+            area de casi 700px de alto: por eso se leian chicos y perdidos. Lo
+            que cambia no es su tamano sino que ahora hay algo DEBAJO que los
+            contiene.
+          */}
+            <div className="absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2">
+              <div className="relative flex flex-col items-center gap-2 rounded-[2.5rem] px-10 py-6">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 rounded-[2.5rem] bg-black/15
+                           shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] ring-1 ring-white/5"
+                />
+                <DirectionIndicator
+                  direction={direction}
+                  flash={announcement?.kind === 'reverse'}
+                />
+                <DiscardPile
+                  top={discardTop}
+                  activeColor={activeColor}
+                  drawPileCount={drawPileCount}
+                  canDraw={isMyTurn}
+                  {...(onDraw ? { onDraw } : {})}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -123,8 +173,23 @@ export function TableLayout({
           lo que hace posible el layout de 10.
         */}
         <div
-          className={`relative border-t-2 transition-colors duration-300
-                      ${isMyTurn ? 'border-brand-accent bg-scrim' : 'border-subtle bg-sunken'}`}
+          /*
+            Tu LUGAR en la mesa, no un panel aparte.
+
+            El `border-t-2` de lado a lado era una linea que PARTIA la pantalla
+            en dos: mesa arriba, UI abajo. Por eso la mano se sentia "lejos y
+            desprendida" — visualmente pertenecia a otra cosa.
+
+            Ahora no hay linea. El degrade sube desde el borde inferior y se
+            desvanece contra el fieltro, asi que tu sector es el mismo
+            continuo que la mesa: es donde estas sentado vos.
+          */
+          className={`relative -mt-6 bg-gradient-to-t transition-colors duration-300
+                      ${
+                        isMyTurn
+                          ? 'from-black/70 via-black/45 to-transparent'
+                          : 'from-black/55 via-black/30 to-transparent'
+                      }`}
         >
           {/* Cuando te toca cambia el marco entero: con gente en videollamada la
               atencion esta partida y no se puede asumir que miren la mesa. */}
