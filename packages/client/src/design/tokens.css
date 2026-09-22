@@ -54,6 +54,26 @@
   --felt: 20 83 45;
   --felt-dark: 11 58 32;
 
+  /**
+   * La superficie de la mesa.
+   *
+   * Un radial de `--felt` en el centro a `--felt-dark` en los bordes: la mesa
+   * se lee como iluminada desde arriba, que es como se ve una mesa real de
+   * juego. Antes era un `bg-felt-dark` plano y `--felt` estaba declarado sin
+   * usarse — habia UN solo verde en toda la app.
+   *
+   * El centro del degrade esta en 50% 38%, no en el medio: coincide con el
+   * centro del arco de asientos (`CENTER_Y = 45` de `seats.ts`) corrido hacia
+   * arriba para compensar que la barra de mano se come el tercio inferior.
+   *
+   * Es CSS puro: cero bytes de red.
+   */
+  --felt-surface: radial-gradient(
+    ellipse 75% 60% at 50% 38%,
+    rgb(var(--felt)) 0%,
+    rgb(var(--felt-dark)) 70%
+  );
+
   /* ---------------------------------------------------------------------
    * SUPERFICIES — por elevación sobre el fieltro.
    *

@@ -58,7 +58,7 @@ export function TableLayout({
 
   return (
     <LayoutGroup>
-      <div className="flex h-full min-h-screen flex-col bg-felt-dark">
+      <div className="flex h-full min-h-screen flex-col bg-felt-dark bg-felt">
         {/* Mesa: los oponentes en el arco, el mazo y el descarte al centro. */}
         <div className="relative flex-1">
           <AnimatePresence>

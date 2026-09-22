@@ -71,6 +71,12 @@ export default {
         },
       },
 
+      backgroundImage: {
+        // La superficie de la mesa. Va como imagen y no como color porque es
+        // un degrade; ver el token en tokens.css.
+        felt: 'var(--felt-surface)',
+      },
+
       // Superficies: ya llevan su alpha horneada, por eso van como backgroundColor
       // y no como `colors` — no admiten `/40` y está bien que no lo admitan.
       backgroundColor: {
