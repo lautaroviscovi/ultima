@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createRoom, joinRoom } from '../net/commands.js';
 import { useSessionStore } from '../stores/session.js';
 import { useFitsTable } from '../hooks/useFitsTable.js';
-import { MIN_WIDTH } from '../components/TableLayout.js';
+import { MIN_HEIGHT, MIN_WIDTH } from '../components/TableLayout.js';
 
 /**
  * El campo de texto de esta pantalla.
@@ -84,9 +84,9 @@ export function Home(): JSX.Element {
         */}
         {!fitsTable && (
           <p className="mb-6 rounded-lg bg-intent-warn/15 px-4 py-3 text-center text-body text-intent-warn">
-            Esta pantalla es angosta para la mesa, que necesita {MIN_WIDTH}px. Podés crear la sala
-            igual y pasar el código, pero para <strong className="font-bold">jugar</strong> vas a
-            necesitar una ventana más ancha.
+            Esta pantalla es chica para la mesa, que necesita {MIN_WIDTH}×{MIN_HEIGHT}px. Podés
+            crear la sala igual y pasar el código, pero para{' '}
+            <strong className="font-bold">jugar</strong> vas a necesitar una ventana más grande.
           </p>
         )}
 

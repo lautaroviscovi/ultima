@@ -37,7 +37,7 @@ import { ErrorToast } from '../components/ErrorToast.js';
 import { EventLog } from '../components/EventLog.js';
 import { HudButton } from '../components/HudButton.js';
 import { RoundOverlay } from '../components/RoundOverlay.js';
-import { MIN_WIDTH, TableLayout } from '../components/TableLayout.js';
+import { MIN_HEIGHT, MIN_WIDTH, TableLayout } from '../components/TableLayout.js';
 import { DrawFlightLayer } from '../components/DrawFlight.js';
 
 export function Table(): JSX.Element {
@@ -200,10 +200,10 @@ export function Table(): JSX.Element {
   if (!fitsTable) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-felt-dark p-8 text-center text-white">
-        <p className="font-display text-display-sm font-bold">Necesitás una ventana más ancha</p>
+        <p className="font-display text-display-sm font-bold">Necesitás una ventana más grande</p>
         <p className="max-w-sm text-white/60">
-          La mesa de hasta 10 jugadores necesita al menos {MIN_WIDTH}px para que se lea bien.
-          Agrandá la ventana o pasá a una pantalla más grande.
+          La mesa de hasta 10 jugadores necesita al menos {MIN_WIDTH}×{MIN_HEIGHT}px para que se lea
+          bien. Agrandá la ventana o pasá a una pantalla más grande.
         </p>
       </main>
     );

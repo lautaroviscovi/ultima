@@ -38,6 +38,20 @@ export interface TableLayoutProps {
 /** Ancho minimo del layout de 10. Por debajo, la mesa no es legible. */
 export const MIN_WIDTH = 1100;
 
+/**
+ * Alto minimo, derivado de lo que la mesa OCUPA, no elegido a ojo.
+ *
+ * Medido en el layout de 10: la barra de mano son 212px, el HUD se reserva 48
+ * arriba, y el arco necesita alto suficiente para que sus filas de asientos
+ * (84px cada uno) no se pisen. Eso da ~470px de piso duro; 600 deja el margen
+ * que hace que la mesa se juegue comoda y no al limite.
+ *
+ * Antes no existia: `useFitsTable` validaba SOLO el ancho, asi que una ventana
+ * ancha y baja pasaba el control y entraba a una mesa rota, con los asientos
+ * de arriba tapados por el HUD.
+ */
+export const MIN_HEIGHT = 600;
+
 export function TableLayout({
   opponents,
   hand,
@@ -100,8 +114,18 @@ export function TableLayout({
 
             Posicionado absoluto contra el padre relative, el area tiene alto
             real y los porcentajes vuelven a significar lo que dicen.
+
+            **Arriba el margen es FIJO, no porcentual.** El HUD de la mesa
+            (`Table.tsx`) es `absolute top-4` y ocupa hasta 40px del borde —
+            medido, no estimado. Un 2% de una ventana de 654px son 13px, asi que
+            el asiento de mas arriba del arco quedaba TAPADO por el HUD: es el
+            bug que se veia en la partida.
+
+            Con `top-12` (48px) el asiento arranca siempre por debajo del HUD,
+            sin importar el alto de la ventana. Abajo sigue porcentual porque
+            ahi no hay nada fijo con lo que chocar.
           */}
-          <div className="absolute inset-x-[6%] inset-y-[2%]">
+          <div className="absolute inset-x-[6%] bottom-[2%] top-12">
             {/*
               La mesa se dibuja ANTES que todo lo demas: es la superficie sobre
               la que se apoyan los asientos y el centro, no una capa encima.

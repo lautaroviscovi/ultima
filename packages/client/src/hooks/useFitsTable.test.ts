@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useFitsTable } from './useFitsTable.js';
-import { MIN_WIDTH } from '../components/TableLayout.js';
+import { MIN_HEIGHT, MIN_WIDTH } from '../components/TableLayout.js';
 
 /**
  * El modo de falla de este hook es SILENCIOSO: si deja de reaccionar, el aviso
@@ -15,7 +15,7 @@ function mockMatchMedia(matches: boolean) {
   const listeners: Listener[] = [];
   const mql = {
     matches,
-    media: `(min-width: ${MIN_WIDTH}px)`,
+    media: `(min-width: ${MIN_WIDTH}px) and (min-height: ${MIN_HEIGHT}px)`,
     addEventListener: (_: string, fn: Listener) => listeners.push(fn),
     removeEventListener: (_: string, fn: Listener) => {
       const i = listeners.indexOf(fn);
@@ -70,7 +70,9 @@ describe('useFitsTable', () => {
     // duplicado aca haria que el aviso y la mesa discrepen.
     const media = mockMatchMedia(true);
     renderHook(() => useFitsTable());
-    expect(media.spy).toHaveBeenCalledWith(`(min-width: ${MIN_WIDTH}px)`);
+    expect(media.spy).toHaveBeenCalledWith(
+      `(min-width: ${MIN_WIDTH}px) and (min-height: ${MIN_HEIGHT}px)`,
+    );
   });
 
   it('no explota si matchMedia no existe', () => {
@@ -79,6 +81,27 @@ describe('useFitsTable', () => {
     vi.stubGlobal('matchMedia', undefined);
     const { result } = renderHook(() => useFitsTable());
     expect(result.current).toBe(true);
+  });
+
+  /**
+   * EL BUG: una ventana ancha pero BAJA pasaba el control.
+   *
+   * La query validaba solo `min-width`, asi que en una ventana de 1400x654 el
+   * hook decia que si, la mesa se dibujaba, y el arco quedaba comprimido
+   * contra el HUD con los asientos de arriba tapados.
+   *
+   * No se puede testear con dimensiones reales porque `matchMedia` esta
+   * mockeado, asi que lo que se verifica es lo unico que importa: que la
+   * consulta PREGUNTE por el alto. Sin eso, el navegador nunca puede
+   * responder que no.
+   */
+  it('EL BUG: la consulta también pregunta por el alto', () => {
+    const media = mockMatchMedia(true);
+    renderHook(() => useFitsTable());
+    expect(
+      media.spy.mock.calls[0]?.join(''),
+      'una ventana ancha y baja pasaría el control',
+    ).toContain('min-height');
   });
 
   it('desuscribe al desmontar, para no filtrar listeners', () => {

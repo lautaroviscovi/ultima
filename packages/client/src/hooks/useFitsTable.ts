@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { MIN_WIDTH } from '../components/TableLayout.js';
+import { MIN_HEIGHT, MIN_WIDTH } from '../components/TableLayout.js';
 
 /**
- * Si la ventana da el ancho que la mesa de 10 necesita.
+ * Si la ventana da el ancho Y EL ALTO que la mesa de 10 necesita.
  *
  * Vivia suelto adentro de `Table.tsx`, y por eso el aviso llegaba TARDE: el
  * chequeo existia solo en la mesa, asi que desde el telefono se podia crear la
@@ -14,9 +14,14 @@ import { MIN_WIDTH } from '../components/TableLayout.js';
  *
  * `MIN_WIDTH` sigue siendo decision de producto (desktop-only, ver
  * `TableLayout.tsx`): lo que cambia es donde se avisa, no el limite.
+ *
+ * **El alto tambien cuenta**, y antes no. Una ventana ancha pero baja pasaba
+ * el control y entraba a una mesa rota: el arco se comprime contra el HUD y
+ * los asientos de arriba quedan tapados. Es lo que se vio jugando en una
+ * ventana de 654px de alto.
  */
 /** La misma consulta en el valor inicial y en la suscripcion. */
-const QUERY = `(min-width: ${MIN_WIDTH}px)`;
+const QUERY = `(min-width: ${MIN_WIDTH}px) and (min-height: ${MIN_HEIGHT}px)`;
 
 export function useFitsTable(): boolean {
   /**

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { GameError } from '../stores/game.js';
 import { errorCopy } from '../net/errorCopy.js';
 
@@ -17,11 +17,35 @@ export function ErrorToast({
   error: GameError | null;
   onDismiss: () => void;
 }): JSX.Element | null {
+  /**
+   * EL BUG: el toast se quedaba fijo en pantalla, para siempre.
+   *
+   * El temporizador estaba bien —3 segundos y se va— pero el efecto dependia
+   * de `onDismiss`, y quien lo usa lo pasa como arrow inline
+   * (`onDismiss={() => setError(null)}`). Eso es una funcion NUEVA en cada
+   * render, asi que React re-corria el efecto, el cleanup cancelaba el timer
+   * y volvia a arrancar de cero.
+   *
+   * En una partida hay renders todo el tiempo (el reloj del turno, cada carta
+   * jugada, cada patch del servidor), asi que la cuenta se reiniciaba antes de
+   * llegar a 3s y el toast no se iba nunca.
+   *
+   * La ref rompe esa dependencia: el efecto se dispara SOLO cuando cambia el
+   * error, que es la unica razon legitima para reiniciar la cuenta.
+   */
+  const dismissRef = useRef(onDismiss);
+
+  // La ref se actualiza en un efecto, no durante el render: escribirla en el
+  // cuerpo del componente es lo que `react-hooks/refs` prohibe, y con razon.
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
+
   useEffect(() => {
     if (!error) return;
-    const id = setTimeout(onDismiss, 3000);
+    const id = setTimeout(() => dismissRef.current(), 3000);
     return () => clearTimeout(id);
-  }, [error, onDismiss]);
+  }, [error]);
 
   if (!error) return null;
 
