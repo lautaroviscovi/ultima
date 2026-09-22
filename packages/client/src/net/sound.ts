@@ -7,7 +7,7 @@
  * mira la mesa todo el tiempo.
  */
 
-type SoundName = 'turn' | 'play' | 'draw' | 'uno' | 'win' | 'reverse';
+type SoundName = 'turn' | 'play' | 'draw' | 'penalty' | 'uno' | 'win' | 'reverse';
 
 interface Tone {
   freq: number;
@@ -36,6 +36,12 @@ const TONES: Record<SoundName, Tone[]> = {
     { freq: 659, duration: 0.1, type: 'sine', gain: 0.16 },
     { freq: 784, duration: 0.18, type: 'sine', gain: 0.16 },
   ],
+  /**
+   * Castigo (+2 / +4). Barrido DESCENDENTE y mas grave que `draw`: robar por
+   * turno es neutro, que te impongan cartas no. Usar el mismo sonido para los
+   * dos borraba justo la distincion que importa.
+   */
+  penalty: [{ freq: 300, duration: 0.18, type: 'sawtooth', gain: 0.13, sweepTo: 140 }],
   // Barrido descendente: el reverse suena a "algo se dio vuelta".
   reverse: [{ freq: 700, duration: 0.22, type: 'sawtooth', gain: 0.1, sweepTo: 300 }],
 };
@@ -62,11 +68,31 @@ export function unlockAudio(): void {
   if (ctx?.state === 'suspended') void ctx.resume();
 }
 
+/**
+ * Variacion de tono por llamada.
+ *
+ * Dos cartas robadas seguidas sonaban EXACTAMENTE igual, y repetir un sample
+ * identico es lo que hace que un sonido se perciba como sintetico y canse. Un
+ * semitono arriba o abajo alcanza para que se lean como dos eventos y no como
+ * un eco.
+ *
+ * Se aplica solo a los sonidos que se repiten en rafaga; el tick de turno y la
+ * victoria mantienen su tono, porque ahi la constancia es la señal.
+ */
+const VARIES: ReadonlySet<SoundName> = new Set(['draw', 'play', 'penalty']);
+
+/** +-1 semitono, que en frecuencia es un factor de 2^(1/12). */
+function pitchFor(name: SoundName): number {
+  if (!VARIES.has(name)) return 1;
+  return 2 ** ((Math.random() * 2 - 1) / 12);
+}
+
 export function playSound(name: SoundName, enabled: boolean): void {
   if (!enabled) return;
   const ctx = getContext();
   if (!ctx || ctx.state === 'suspended') return;
 
+  const pitch = pitchFor(name);
   let offset = 0;
   for (const tone of TONES[name]) {
     const osc = ctx.createOscillator();
@@ -74,9 +100,9 @@ export function playSound(name: SoundName, enabled: boolean): void {
     const start = ctx.currentTime + offset;
 
     osc.type = tone.type;
-    osc.frequency.setValueAtTime(tone.freq, start);
+    osc.frequency.setValueAtTime(tone.freq * pitch, start);
     if (tone.sweepTo !== undefined) {
-      osc.frequency.exponentialRampToValueAtTime(tone.sweepTo, start + tone.duration);
+      osc.frequency.exponentialRampToValueAtTime(tone.sweepTo * pitch, start + tone.duration);
     }
 
     // Ataque y caida suaves: un corte seco suena a "click" defectuoso.

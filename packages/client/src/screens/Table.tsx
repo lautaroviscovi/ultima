@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MotionConfig } from 'framer-motion';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import { isWild, type Card, type Color } from '@uno/engine';
 import {
@@ -27,6 +27,7 @@ import {
 import { useTurnTimer } from '../hooks/useTurnTimer.js';
 import { useEventLog } from '../hooks/useEventLog.js';
 import { useGameSounds } from '../hooks/useGameSounds.js';
+import { useGameMoments } from '../hooks/useGameMoments.js';
 import { useReducedMotion } from '../hooks/useReducedMotion.js';
 import { unlockAudio } from '../net/sound.js';
 import { ColorPicker } from '../components/ColorPicker.js';
@@ -35,6 +36,7 @@ import { ErrorToast } from '../components/ErrorToast.js';
 import { EventLog } from '../components/EventLog.js';
 import { RoundOverlay } from '../components/RoundOverlay.js';
 import { MIN_WIDTH, TableLayout } from '../components/TableLayout.js';
+import { DrawFlightLayer } from '../components/DrawFlight.js';
 
 export function Table(): JSX.Element {
   const { code = '' } = useParams();
@@ -59,6 +61,7 @@ export function Table(): JSX.Element {
   const toggleSound = useUIStore((s) => s.toggleSound);
   const [sortMode, setSortMode] = useSortMode();
   useGameSounds();
+  const { flights, penalty } = useGameMoments();
 
   const colorPickerOpen = useUIStore((s) => s.colorPickerOpen);
   const pendingWildCardId = useUIStore((s) => s.pendingWildCardId);
@@ -211,6 +214,22 @@ export function Table(): JSX.Element {
   return (
     <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'}>
       <main className="relative min-h-screen bg-felt-dark">
+        {/* Castigo (+2/+4): marco rojo, no un toast. Lo que comunica es "esto
+            te pasa A VOS", y un borde perimetral se percibe sin leer nada —
+            que es lo que hace falta con la atencion partida en una llamada. */}
+        <AnimatePresence>
+          {penalty > 0 && (
+            <motion.div
+              key="penalty-flash"
+              className="pointer-events-none absolute inset-0 z-30 shadow-glow-inset"
+              style={{ '--glow-color': 'var(--intent-urgent)' } as Record<string, string>}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0, 1, 1, 0] }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.1, times: [0, 0.12, 0.7, 1] }}
+            />
+          )}
+        </AnimatePresence>
         <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
           <ConnectionBadge status={connection} />
           <span className="rounded-full bg-sunken px-3 py-1 font-mono text-xs text-white/60">
@@ -218,8 +237,10 @@ export function Table(): JSX.Element {
           </span>
           {isMyTurn && timer.secondsLeft <= 15 && (
             <span
-              className={`rounded-full px-3 py-1 text-xs font-bold ${
-                timer.secondsLeft <= 5 ? 'bg-uno-red text-white' : 'bg-uno-yellow text-black'
+              className={`rounded-full px-3 py-1 text-mini font-bold tabular-nums ${
+                timer.secondsLeft <= 5
+                  ? 'bg-intent-urgent text-white'
+                  : 'bg-intent-warn text-brand-ink'
               }`}
             >
               {timer.secondsLeft}s
@@ -295,6 +316,11 @@ export function Table(): JSX.Element {
         />
 
         <ErrorToast error={lastError} onDismiss={() => setError(null)} />
+
+        {/* Fuera del LayoutGroup de TableLayout a proposito: el vuelo es un
+            nodo independiente y no debe compartir contexto de layout con las
+            cartas de la mano. */}
+        <DrawFlightLayer flights={flights} />
       </main>
     </MotionConfig>
   );

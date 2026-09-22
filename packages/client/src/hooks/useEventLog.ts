@@ -86,24 +86,27 @@ export function useEventLog(): LogEntry[] {
   const nextId = useRef(0);
 
   useEffect(() => {
-    // Nos suscribimos a la cola: cada patch la llena y nosotros la vaciamos.
-    return useGameStore.subscribe((store, prev) => {
-      if (store.events === prev.events || store.events.length === 0) return;
+    /**
+     * Antes este hook VACIABA la cola con `drainEvents()`, y eso rompia a los
+     * demas consumidores: el que corriera despues encontraba la cola vacia.
+     * Ahora cada uno lleva su propia marca contra `eventSeq`, que solo crece.
+     */
+    let seen = useGameStore.getState().eventSeq;
+
+    return useGameStore.subscribe((store) => {
+      if (store.eventSeq === seen || !store.state) return;
+      const pending = store.eventSeq - seen;
+      seen = store.eventSeq;
       const state = store.state;
-      if (!state) return;
 
       const fresh = store.events
+        .slice(Math.max(0, store.events.length - pending))
         .map((event) => describe(event, state))
         .filter((entry): entry is Omit<LogEntry, 'id'> => entry !== null)
         .map((entry) => ({ ...entry, id: nextId.current++ }));
 
-      if (fresh.length === 0) {
-        useGameStore.getState().drainEvents();
-        return;
-      }
-
+      if (fresh.length === 0) return;
       setEntries((prevEntries) => [...prevEntries, ...fresh].slice(-MAX_ENTRIES));
-      useGameStore.getState().drainEvents();
     });
   }, []);
 

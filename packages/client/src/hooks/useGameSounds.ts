@@ -13,7 +13,11 @@ export function useGameSounds(): void {
   const wasMyTurn = useRef(false);
 
   useEffect(() => {
-    return useGameStore.subscribe((store, prev) => {
+    // Marca propia contra `eventSeq`: no depende de que otro consumidor haya
+    // leido o vaciado la cola antes. Ver el comentario en el store.
+    let seen = useGameStore.getState().eventSeq;
+
+    return useGameStore.subscribe((store) => {
       const enabled = useUIStore.getState().soundEnabled;
       if (!enabled || !store.state) return;
 
@@ -21,9 +25,10 @@ export function useGameSounds(): void {
       if (myTurn && !wasMyTurn.current) playSound('turn', enabled);
       wasMyTurn.current = myTurn;
 
-      // Los eventos nuevos de este patch.
-      if (store.events === prev.events) return;
-      const fresh = store.events.slice(prev.events.length);
+      if (store.eventSeq === seen) return;
+      const pending = store.eventSeq - seen;
+      seen = store.eventSeq;
+      const fresh = store.events.slice(Math.max(0, store.events.length - pending));
 
       for (const event of fresh) {
         switch (event.type) {
@@ -31,7 +36,22 @@ export function useGameSounds(): void {
             playSound('play', enabled);
             break;
           case 'CARDS_DRAWN':
-            playSound('draw', enabled);
+            /**
+             * Robar por turno saca exactamente UNA carta; mas de una es
+             * siempre un castigo (+2/+4). Sonaban igual, que es perder la
+             * distincion mas util del set: una es neutra y la otra no.
+             *
+             * Se escalona para que se oigan como N cartas y no como una sola
+             * mas fuerte.
+             */
+            if (event.count > 1) {
+              playSound('penalty', enabled);
+              for (let i = 1; i < Math.min(event.count, 4); i++) {
+                setTimeout(() => playSound('draw', enabled), i * 110);
+              }
+            } else {
+              playSound('draw', enabled);
+            }
             break;
           case 'DIRECTION_REVERSED':
             playSound('reverse', enabled);

@@ -24,17 +24,41 @@ export interface GameStoreState {
   room: RedactedRoomState | null;
   connection: ConnectionStatus;
   lastError: GameError | null;
-  /** Cola de eventos para animaciones y log de mesa. Se consume y se limpia. */
+  /**
+   * Cola de eventos para animaciones y log de mesa.
+   *
+   * Hay VARIOS consumidores (log, sonido, animaciones) y ninguno la vacia:
+   * antes el log la drenaba y el que corriera despues encontraba una cola
+   * vacia. Para saber que te falta ver, compararse contra `eventSeq`.
+   */
   events: GameEvent[];
+  /**
+   * Cuantos eventos se encolaron DESDE SIEMPRE.
+   *
+   * Es lo que permite que varios consumidores independientes sepan que les
+   * falta ver sin pisarse: cada uno recuerda hasta que numero proceso. Sin
+   * esto, el orden de registro de los hooks decide quien ve los eventos —
+   * que es una carrera, y fue un bug real: el sonido de robo sonaba pero la
+   * carta no volaba.
+   */
+  eventSeq: number;
 
   applySync(state: RedactedGameState): void;
   applyPatch(state: RedactedGameState, events: GameEvent[]): void;
   applyRoom(room: RedactedRoomState): void;
   setConnection(status: ConnectionStatus): void;
   setError(error: Omit<GameError, 'at'> | null): void;
-  drainEvents(): GameEvent[];
   reset(): void;
 }
+
+/**
+ * Cuantos eventos se guardan.
+ *
+ * Los consumidores leen en la misma notificacion en que llegan, asi que con
+ * mucho menos alcanzaria; el margen cubre un patch grande (un +4 con
+ * rebarajado y fin de ronda encadenados).
+ */
+const MAX_EVENTS = 200;
 
 const initial = {
   state: null,
@@ -42,11 +66,18 @@ const initial = {
   connection: 'idle' as ConnectionStatus,
   lastError: null,
   events: [] as GameEvent[],
+  eventSeq: 0,
 };
 
-export const useGameStore = create<GameStoreState>()((set, get) => ({
+export const useGameStore = create<GameStoreState>()((set) => ({
   ...initial,
 
+  /**
+   * Un sync es un punto de partida, no un diff: se descartan los eventos
+   * pendientes. `eventSeq` NO se reinicia, asi los consumidores detectan el
+   * corte comparando su marca en vez de reprocesar una cola que ya no
+   * corresponde al estado nuevo.
+   */
   applySync: (state) => set({ state, events: [] }),
 
   applyPatch: (state, events) =>
@@ -57,18 +88,20 @@ export const useGameStore = create<GameStoreState>()((set, get) => ({
        * un patch atrasado que pisaria el sync fresco.
        */
       if (prev.state && state.version <= prev.state.version) return prev;
-      return { state, events: [...prev.events, ...events] };
+      return {
+        state,
+        // Ventana acotada: la cola ya no la vacia un consumidor (eso era una
+        // carrera con los demas), asi que se limita por tamaño. MAX_EVENTS es
+        // holgado — un patch trae unos pocos eventos y todos los consumidores
+        // corren sincronicamente en la misma notificacion.
+        events: [...prev.events, ...events].slice(-MAX_EVENTS),
+        eventSeq: prev.eventSeq + events.length,
+      };
     }),
 
   applyRoom: (room) => set({ room }),
   setConnection: (connection) => set({ connection }),
   setError: (error) => set({ lastError: error ? { ...error, at: Date.now() } : null }),
-
-  drainEvents: () => {
-    const events = get().events;
-    if (events.length) set({ events: [] });
-    return events;
-  },
 
   reset: () => set({ ...initial }),
 }));
