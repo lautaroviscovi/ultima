@@ -78,7 +78,9 @@ function render(state: RedactedGameState, myId: string): void {
 
   if (me) {
     const playable = new Set(
-      getPlayableCards(state.you.hand, state.activeColor, state.discardTop).map((c) => c.id),
+      getPlayableCards(state.you.hand, state.activeColor, state.discardTop, state.pendingDraw).map(
+        (c) => c.id,
+      ),
     );
     console.log('\n  tu mano:');
     state.you.hand.forEach((card, i) => {
@@ -120,7 +122,12 @@ async function runBot(roomId: string, index: number): Promise<void> {
       } else if (state.phase === 'card_drawn') {
         command = { type: 'PASS' };
       } else {
-        const card = getPlayableCards(state.you.hand, state.activeColor, state.discardTop)[0];
+        const card = getPlayableCards(
+          state.you.hand,
+          state.activeColor,
+          state.discardTop,
+          state.pendingDraw,
+        )[0];
         command = card
           ? { type: 'PLAY_CARD', cardId: card.id, chosenColor: 'red', declareUno: true }
           : { type: 'DRAW_CARD' };

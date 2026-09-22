@@ -36,6 +36,12 @@ function describe(event: GameEvent, state: RedactedGameState): Omit<LogEntry, 'i
       };
     case 'PLAYER_SKIPPED':
       return { text: `${who(state, event.playerId)} pierde el turno`, tone: 'normal' };
+    case 'DRAW_STACKED':
+      // El total, no el incremento: lo que importa es a cuanto llego la cadena.
+      return {
+        text: `${who(state, event.playerId)} tiene que responder o robar ${event.total}`,
+        tone: 'alert',
+      };
     case 'DIRECTION_REVERSED':
       return {
         text: `Cambio de sentido: ahora ${event.direction === 1 ? 'horario' : 'antihorario'}`,

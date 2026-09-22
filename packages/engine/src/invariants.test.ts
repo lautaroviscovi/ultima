@@ -42,7 +42,11 @@ function randomStep(state: GameState, rng: Rng, turn: number): GameState {
   if (state.phase === 'card_drawn') {
     const card = player.hand.find((c) => c.id === state.drawnCardId);
     const top = state.discardPile.at(-1) ?? null;
-    if (card && rng.nextInt(2) === 0 && getPlayableCards([card], state.activeColor, top).length) {
+    if (
+      card &&
+      rng.nextInt(2) === 0 &&
+      getPlayableCards([card], state.activeColor, top, state.pendingDraw).length
+    ) {
       return reduce(state, { type: 'PLAY_DRAWN_CARD', chosenColor: 'red', declareUno: true }, ctx)
         .state;
     }
@@ -50,7 +54,7 @@ function randomStep(state: GameState, rng: Rng, turn: number): GameState {
   }
 
   const top = state.discardPile.at(-1) ?? null;
-  const playable = getPlayableCards(player.hand, state.activeColor, top);
+  const playable = getPlayableCards(player.hand, state.activeColor, top, state.pendingDraw);
   if (playable.length > 0) {
     const card = rng.pick(playable);
     return reduce(

@@ -17,6 +17,13 @@ export interface HandActionsProps {
   mustDraw?: boolean;
   onDraw?: () => void;
   /**
+   * Cartas acumuladas por una cadena de +2/+4 que te toca responder.
+   *
+   * Cambia lo que dice el boton: "Robar" y "Comerme 6" son acciones muy
+   * distintas, y la segunda merece que el jugador la lea ANTES de tocarla.
+   */
+  pendingDraw?: number;
+  /**
    * Robaste una carta que SI se puede jugar, y podes quedartela.
    *
    * Solo en fase `card_drawn`: fuera de ella el motor rechaza el comando, asi
@@ -50,6 +57,7 @@ export function HandActions({
   onDeclareUno,
   mustDraw = false,
   onDraw,
+  pendingDraw = 0,
   canPass = false,
   onPass,
   callOut = null,
@@ -110,10 +118,19 @@ export function HandActions({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={SPRING.pop}
-            className="rounded-full bg-raised-hover px-5 py-1.5 font-display text-body font-bold
-                       text-white shadow-card-lift hover:brightness-125"
+            className={`rounded-full px-5 py-1.5 font-display text-body font-bold shadow-card-lift
+                        ${
+                          pendingDraw > 0
+                            ? 'bg-intent-urgent text-white hover:brightness-110'
+                            : 'bg-raised-hover text-white hover:brightness-125'
+                        }`}
           >
-            Robar
+            {/*
+              Con un castigo encima esto NO es robar una carta: es comerse la
+              cadena entera. Decir "Robar" a secas escondería el precio justo
+              cuando es mas alto.
+            */}
+            {pendingDraw > 0 ? `Comerme ${pendingDraw}` : 'Robar'}
           </motion.button>
         )}
 

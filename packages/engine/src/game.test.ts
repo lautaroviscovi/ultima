@@ -186,16 +186,25 @@ describe('jugar cartas', () => {
     expect(current(next).id).toBe('p2');
   });
 
-  it('draw2 hace robar 2 al siguiente y lo saltea', () => {
+  /**
+   * APILADO: el +2 ya no roba en el acto.
+   *
+   * Antes este test decia "hace robar 2 al siguiente y lo saltea". Ahora el
+   * castigo se acumula en `pendingDraw` y el objetivo TIENE EL TURNO, con una
+   * sola decision: taparlo o comerselo.
+   */
+  it('draw2 acumula el castigo y le pasa el turno al objetivo', () => {
     const card = colored('draw2', 'red');
     const state = gameWith([card, num('red', 1)], num('red', 3));
     const before = state.players[1]!.hand.length;
     const { state: next } = apply(state, { type: 'PLAY_CARD', cardId: card.id }, 'p0');
-    expect(next.players[1]!.hand).toHaveLength(before + 2);
-    expect(current(next).id).toBe('p2');
+
+    expect(next.players[1]!.hand, 'robó en el acto, no acumuló').toHaveLength(before);
+    expect(next.pendingDraw).toBe(2);
+    expect(current(next).id, 'el objetivo tiene que poder responder').toBe('p1');
   });
 
-  it('wild4 hace robar 4 al siguiente y lo saltea', () => {
+  it('wild4 acumula 4 y fija el color igual', () => {
     const card = wild4();
     const state = gameWith([card, num('red', 1)], num('red', 3));
     const before = state.players[1]!.hand.length;
@@ -204,9 +213,121 @@ describe('jugar cartas', () => {
       { type: 'PLAY_CARD', cardId: card.id, chosenColor: 'green' },
       'p0',
     );
-    expect(next.players[1]!.hand).toHaveLength(before + 4);
+
+    expect(next.players[1]!.hand).toHaveLength(before);
+    expect(next.pendingDraw).toBe(4);
     expect(next.activeColor).toBe('green');
-    expect(current(next).id).toBe('p2');
+    expect(current(next).id).toBe('p1');
+  });
+
+  /** Apilado LIBRE: +2 tapa +4 y viceversa, sin importar el color. */
+  it('un +2 se puede tapar con otro +2 de otro color, y suma', () => {
+    const mio = colored('draw2', 'red');
+    const suyo = colored('draw2', 'yellow');
+    let state = gameWith([mio, num('red', 1)], num('red', 3));
+    state = {
+      ...state,
+      players: state.players.map((p, i) => (i === 1 ? { ...p, hand: [suyo, num('blue', 5)] } : p)),
+    };
+
+    const { state: tras1 } = apply(state, { type: 'PLAY_CARD', cardId: mio.id }, 'p0');
+    const { state: tras2 } = apply(tras1, { type: 'PLAY_CARD', cardId: suyo.id }, 'p1');
+
+    expect(tras2.pendingDraw, 'no acumuló el segundo +2').toBe(4);
+    expect(current(tras2).id).toBe('p2');
+  });
+
+  it('con un castigo encima, una carta comun es ilegal', () => {
+    const mio = colored('draw2', 'red');
+    const comun = num('red', 5);
+    let state = gameWith([mio, num('red', 1)], num('red', 3));
+    state = {
+      ...state,
+      players: state.players.map((p, i) => (i === 1 ? { ...p, hand: [comun] } : p)),
+    };
+
+    const { state: tras1 } = apply(state, { type: 'PLAY_CARD', cardId: mio.id }, 'p0');
+    expect(() => apply(tras1, { type: 'PLAY_CARD', cardId: comun.id }, 'p1')).toThrow();
+  });
+
+  /**
+   * LA TRAMPA DEL APILADO: dejar vencer el reloj no puede ser la salida barata.
+   *
+   * `applyTimeout` robaba 1 carta y avanzaba. Con un castigo acumulado encima
+   * eso lo evaporaba: bastaba con no hacer nada para esquivar un +8, y la
+   * mecanica entera se caia. Vencerse el tiempo es no responder, que es
+   * exactamente comerselo.
+   */
+  it('EL RIESGO: el timeout con un castigo encima roba el acumulado, no 1', () => {
+    const mio = colored('draw2', 'red');
+    const suyo = colored('draw2', 'yellow');
+    let state = gameWith([mio, num('red', 1)], num('red', 3));
+    state = {
+      ...state,
+      players: state.players.map((p, i) => (i === 1 ? { ...p, hand: [suyo, num('blue', 5)] } : p)),
+    };
+
+    const { state: a } = apply(state, { type: 'PLAY_CARD', cardId: mio.id }, 'p0');
+    const { state: b } = apply(a, { type: 'PLAY_CARD', cardId: suyo.id }, 'p1');
+    expect(b.pendingDraw).toBe(4);
+
+    const antes = b.players[2]!.hand.length;
+    const { state: c } = reduce(b, { type: 'TIMEOUT' }, { playerId: null, now: 99_999 });
+
+    expect(c.players[2]!.hand, 'el castigo se evaporó con el reloj').toHaveLength(antes + 4);
+    expect(c.pendingDraw).toBe(0);
+  });
+
+  /**
+   * El castigo NO se hereda: es de quien lo recibio.
+   *
+   * Si el que tiene un +6 encima abandona, sus cartas vuelven al mazo y el
+   * turno pasa al siguiente — pero ese siguiente no tiene nada que ver con el
+   * duelo. Sin limpiar `pendingDraw`, se comeria un castigo ajeno.
+   */
+  it('EL RIESGO: abandonar no le pasa el castigo al siguiente', () => {
+    const mio = colored('draw2', 'red');
+    /**
+     * `roomId` propio a proposito: `rngFor` cachea el stream por
+     * `roomId:seed` en un Map GLOBAL, y todos los fixtures usan 'TEST'. Como
+     * abandonar baraja, este test consumiria del stream compartido y
+     * cambiaria el reparto de los tests que corren despues.
+     */
+    const base = gameWith([mio, num('red', 1)], num('red', 3));
+    const state = { ...base, roomId: 'ABANDONO' };
+    const { state: a } = apply(state, { type: 'PLAY_CARD', cardId: mio.id }, 'p0');
+    expect(a.pendingDraw).toBe(2);
+    expect(current(a).id).toBe('p1');
+
+    const { state: b } = reduce(
+      a,
+      { type: 'ABANDON', playerId: 'p1' },
+      { playerId: 'p1', now: 5_000 },
+    );
+
+    expect(b.pendingDraw, 'el siguiente hereda un castigo ajeno').toBe(0);
+  });
+
+  /** La otra salida: robar ES comerse el acumulado, no robar una carta. */
+  it('robar con un castigo encima se lo come entero', () => {
+    const mio = colored('draw2', 'red');
+    const suyo = colored('draw2', 'yellow');
+    let state = gameWith([mio, num('red', 1)], num('red', 3));
+    state = {
+      ...state,
+      // Dos cartas, no una: con una sola, jugarla GANA la ronda y el castigo
+      // se cobra por el otro camino (el de la excepcion del ganador).
+      players: state.players.map((p, i) => (i === 1 ? { ...p, hand: [suyo, num('blue', 5)] } : p)),
+    };
+
+    const { state: a } = apply(state, { type: 'PLAY_CARD', cardId: mio.id }, 'p0');
+    const { state: b } = apply(a, { type: 'PLAY_CARD', cardId: suyo.id }, 'p1');
+    const antes = b.players[2]!.hand.length;
+    const { state: c } = apply(b, { type: 'DRAW_CARD' }, 'p2');
+
+    expect(c.players[2]!.hand, 'robó 1 en vez del acumulado').toHaveLength(antes + 4);
+    expect(c.pendingDraw, 'el castigo quedó pegado').toBe(0);
+    expect(current(c).id, 'el que se lo comió pierde el turno').toBe('p3');
   });
 
   it('el wild sin color entra en choosing_color', () => {

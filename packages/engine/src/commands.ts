@@ -30,6 +30,17 @@ export type GameEvent =
   | { type: 'TURN_CHANGED'; playerId: PlayerId }
   | { type: 'DIRECTION_REVERSED'; direction: 1 | -1 }
   | { type: 'PLAYER_SKIPPED'; playerId: PlayerId }
+  /**
+   * Un +2/+4 se acumulo y le toca responder a `playerId`.
+   *
+   * Lleva el TOTAL, no el incremento: lo que hay que anunciar es "+8", y sin
+   * el total el cliente tendria que llevar su propia cuenta — que es
+   * exactamente la clase de estado duplicado que se desincroniza.
+   *
+   * No se emite cuando el castigo se cobra (ahi va `CARDS_DRAWN`), asi que
+   * los dos eventos nunca describen el mismo hecho.
+   */
+  | { type: 'DRAW_STACKED'; playerId: PlayerId; total: number }
   | { type: 'COLOR_CHOSEN'; playerId: PlayerId; color: Color }
   | { type: 'UNO_DECLARED'; playerId: PlayerId }
   | { type: 'UNO_PENALTY'; playerId: PlayerId; calledBy: PlayerId; cardsDrawn: number }

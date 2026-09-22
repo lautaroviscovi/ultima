@@ -168,8 +168,14 @@ export function useGameMoments(): {
         if (cards.length > 1) {
           setPenalty(cards.length);
           timers.push(setTimeout(() => setPenalty(0), FLIGHT_MS + cards.length * STAGGER_MS + 500));
-          // El +4 le gana al salteo que viene en el mismo batch.
-          offer({ kind: cards.length >= 4 ? 'draw4' : 'draw2' });
+          /**
+           * El cartel dice lo que REALMENTE robás.
+           *
+           * El `kind` sigue decidiendo la prioridad y el color, pero el texto
+           * sale del total: con apilado, deducirlo de `cards.length` mostraba
+           * "+4" para un castigo de 8.
+           */
+          offer({ kind: cards.length >= 4 ? 'draw4' : 'draw2', amount: cards.length });
         }
 
         const stamp = Date.now();

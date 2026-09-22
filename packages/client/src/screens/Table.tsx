@@ -301,6 +301,7 @@ export function Table(): JSX.Element {
           secondsLeft={timer.secondsLeft}
           isMyTurn={isMyTurn}
           canPass={state.phase === 'card_drawn' && isMyTurn}
+          pendingDraw={state.pendingDraw}
           onPass={handlePass}
           unoWindowFor={unoWindowFor}
           unoArmed={unoArmed}

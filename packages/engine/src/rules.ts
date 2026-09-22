@@ -13,7 +13,29 @@ import { cardPoints, type Card, type Color } from './types.js';
  * de desafio. Consecuencia asumida: el +4 no tiene costo. El toggle de
  * validacion estricta es fase 2 y entra exactamente aca.
  */
-export function isPlayable(card: Card, activeColor: Color, discardTop: Card | null): boolean {
+export function isPlayable(
+  card: Card,
+  activeColor: Color,
+  discardTop: Card | null,
+  /**
+   * Cartas acumuladas por una cadena de +2/+4 sin responder.
+   *
+   * Con un castigo encima, lo UNICO jugable es otro +2 o +4: o lo tapas y se
+   * lo pasas al siguiente, o te lo comes. Cualquier otra carta dejaria de ser
+   * un duelo.
+   *
+   * Va opcional y con default 0 a proposito: hay 7 llamadas repartidas entre
+   * motor, cliente, CLI y simulador, y esta funcion es —por su propio
+   * comentario— la mas facil de romper del engine. Con default, las llamadas
+   * que no saben del apilado siguen comportandose igual que siempre.
+   *
+   * Apilado LIBRE por decision de producto: +2 tapa +4 y viceversa, sin
+   * importar el color. Es lo mas caotico y es lo que se eligio.
+   */
+  pendingDraw = 0,
+): boolean {
+  if (pendingDraw > 0) return card.kind === 'draw2' || card.kind === 'wild4';
+
   if (card.kind === 'wild' || card.kind === 'wild4') return true;
   if (card.color === activeColor) return true;
 
@@ -30,8 +52,9 @@ export function getPlayableCards(
   hand: readonly Card[],
   activeColor: Color,
   discardTop: Card | null,
+  pendingDraw = 0,
 ): Card[] {
-  return hand.filter((c) => isPlayable(c, activeColor, discardTop));
+  return hand.filter((c) => isPlayable(c, activeColor, discardTop, pendingDraw));
 }
 
 /** Jugadores que siguen en la ronda (no abandonaron). */

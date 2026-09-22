@@ -114,7 +114,15 @@ describe.each(TRANSPORTS)('transporte %s', (transport) => {
       return;
     }
 
-    const playable = getPlayableCards(state.you.hand, state.activeColor, state.discardTop);
+    // `pendingDraw` no es opcional para un bot: con un +2/+4 encima, el motor
+    // solo acepta otro +2/+4, y elegir cualquier otra carta deja la partida
+    // trabada — el turno no avanza y el test se cuelga.
+    const playable = getPlayableCards(
+      state.you.hand,
+      state.activeColor,
+      state.discardTop,
+      state.pendingDraw,
+    );
     const card = playable[0];
     if (card) {
       await client.command({

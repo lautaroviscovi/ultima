@@ -36,6 +36,8 @@ export interface TableLayoutProps {
    */
   canPass?: boolean;
   onPass?: () => void;
+  /** Castigo acumulado que te toca responder: cambia el boton de robar. */
+  pendingDraw?: number;
   announcement?: Announcement | null;
   onPlay?: (card: CardModel) => void;
   onDraw?: () => void;
@@ -78,6 +80,7 @@ export function TableLayout({
   unoArmed = false,
   canPass = false,
   onPass,
+  pendingDraw = 0,
   announcement = null,
   onPlay,
   onDraw,
@@ -94,8 +97,13 @@ export function TableLayout({
    * `canPass` lo excluye a proposito: en fase `card_drawn` ya robaste, y ahi
    * la accion es jugar la robada o pasar — ofrecer "Robar" de nuevo seria
    * ofrecer algo que el motor rechaza.
+   *
+   * Con un castigo encima el boton va SIEMPRE, aunque tengas jugables: esas
+   * jugables son los +2/+4 con los que podrias taparlo, y comerte la cadena
+   * tiene que seguir siendo una opcion. Sin esta condicion, el jugador que
+   * tiene un +2 en la mano quedaba OBLIGADO a apilar.
    */
-  const mustDraw = isMyTurn && !canPass && (playable?.size ?? 0) === 0;
+  const mustDraw = isMyTurn && !canPass && ((playable?.size ?? 0) === 0 || pendingDraw > 0);
 
   /**
    * A quien se le puede acusar, con su nombre.
@@ -261,6 +269,7 @@ export function TableLayout({
               aboutToWin={aboutToWin}
               armed={unoArmed}
               mustDraw={mustDraw}
+              pendingDraw={pendingDraw}
               canPass={canPass}
               {...(onDraw ? { onDraw } : {})}
               {...(onPass ? { onPass } : {})}

@@ -113,7 +113,7 @@ function step(state: GameState, turn: number): GameState {
   }
 
   const top = state.discardPile.at(-1) ?? null;
-  const playable = getPlayableCards(player.hand, state.activeColor, top);
+  const playable = getPlayableCards(player.hand, state.activeColor, top, state.pendingDraw);
   const card = playable[0];
   if (card) {
     return reduce(

@@ -31,6 +31,7 @@ function play(state: GameState, turns: number, from = 0): GameState {
       player.hand,
       next.activeColor,
       next.discardPile.at(-1) ?? null,
+      next.pendingDraw,
     )[0];
     next = reduce(
       next,

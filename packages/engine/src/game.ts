@@ -292,7 +292,8 @@ export function reduce(state: GameState, command: Command, ctx: CommandContext):
       if (!card) throw new GameError('CARD_NOT_IN_HAND', 'Esa carta no esta en tu mano');
 
       const top = next.discardPile.at(-1) ?? null;
-      if (!isPlayable(card, next.activeColor, top)) {
+      // Con `pendingDraw` la validacion se endurece sola: solo +2/+4 pasan.
+      if (!isPlayable(card, next.activeColor, top, next.pendingDraw)) {
         throw new GameError('ILLEGAL_MOVE', 'Esa carta no es jugable');
       }
       next = playCard(next, player.id, card, command.chosenColor, command.declareUno, ctx, events);
@@ -304,6 +305,31 @@ export function reduce(state: GameState, command: Command, ctx: CommandContext):
         throw new GameError('WRONG_PHASE', `No se puede robar en fase ${next.phase}`);
       }
       const player = requireTurn(next, ctx);
+
+      /**
+       * Con un castigo encima, robar ES comerselo: robas el acumulado y
+       * perdes el turno, sin la opcion de jugar lo robado.
+       *
+       * Es la unica salida ademas de tapar con otro +2/+4, y es la misma
+       * puerta que usa el jugador que NO PUEDE responder y el que no QUIERE.
+       */
+      if (next.pendingDraw > 0) {
+        const penalty = drawCards(next, player.id, next.pendingDraw);
+        next = penalty.state;
+        if (penalty.reshuffled > 0) {
+          events.push({ type: 'DECK_RESHUFFLED', count: penalty.reshuffled });
+        }
+        events.push({
+          type: 'CARDS_DRAWN',
+          playerId: player.id,
+          count: penalty.cards.length,
+          cards: penalty.cards,
+        });
+        events.push({ type: 'PLAYER_SKIPPED', playerId: player.id });
+        next = advanceTurn({ ...next, pendingDraw: 0 }, ctx, events);
+        break;
+      }
+
       const result = drawCards(next, player.id, 1);
       next = result.state;
       if (result.reshuffled > 0) {
@@ -547,7 +573,44 @@ function applyCardEffect(
       const amount = card.kind === 'draw2' ? 2 : 4;
       const targetIndex = nextPlayerIndex(next, next.currentPlayerIndex);
       const target = next.players[targetIndex]!;
-      const result = drawCards(next, target.id, amount);
+      const total = next.pendingDraw + amount;
+      const winner = next.players[next.currentPlayerIndex]!;
+
+      /**
+       * APILADO: el castigo se ACUMULA y le toca al siguiente decidir.
+       *
+       * Antes se robaba en el acto. Ahora `pendingDraw` —que existia en el
+       * estado desde el principio sin que nadie lo leyera ni lo escribiera—
+       * guarda el total, y el siguiente juega su turno con una sola opcion:
+       * tapar con otro +2/+4 (`isPlayable` lo restringe) o comerselo.
+       *
+       * El que se lo come NO roba aca: roba en su propio turno, al no poder
+       * jugar. Eso mantiene una sola puerta de robo.
+       */
+      if (winner.hand.length > 0) {
+        /**
+         * NO se toca `currentPlayerIndex`: el `advanceTurn` del final de esta
+         * funcion ya mueve el turno UNA posicion, y esa posicion es
+         * justamente el objetivo del castigo.
+         *
+         * Es lo contrario del caso `skip`, que si adelanta el indice a mano
+         * —para que el `advanceTurn` caiga en el jugador de DESPUES del
+         * salteado. Aca el objetivo no se saltea: le toca responder.
+         */
+        next = { ...next, pendingDraw: total };
+        events.push({ type: 'DRAW_STACKED', playerId: target.id, total });
+        break;
+      }
+
+      /**
+       * EXCEPCION: el que juega esta carta GANA la ronda con ella.
+       *
+       * No hay turno siguiente donde cobrar el castigo, asi que se cobra
+       * ahora. Mantiene lo de siempre —ver el ORDEN CRITICO de arriba: esas
+       * cartas cuentan para el puntaje del ganador— y ademas nadie puede
+       * responder un apilado cuando la ronda ya termino.
+       */
+      const result = drawCards(next, target.id, total);
       next = result.state;
       if (result.reshuffled > 0) {
         events.push({ type: 'DECK_RESHUFFLED', count: result.reshuffled });
@@ -559,7 +622,7 @@ function applyCardEffect(
         cards: result.cards,
       });
       events.push({ type: 'PLAYER_SKIPPED', playerId: target.id });
-      next = { ...next, currentPlayerIndex: targetIndex };
+      next = { ...next, pendingDraw: 0, currentPlayerIndex: targetIndex };
       break;
     }
     case 'number':
@@ -668,7 +731,16 @@ function applyTimeout(state: GameState, ctx: CommandContext, events: GameEvent[]
   } else if (next.phase === 'card_drawn') {
     next = advanceTurn({ ...next, phase: 'awaiting_turn', drawnCardId: null }, ctx, events);
   } else {
-    const result = drawCards(next, player.id, 1);
+    /**
+     * Con un castigo encima se roba el ACUMULADO, no una carta.
+     *
+     * Robar 1 aca dejaria que dejar vencer el reloj fuera la forma barata de
+     * escaparle a un +8: el castigo se evaporaria, y la mecanica entera con
+     * el. Vencerse el tiempo equivale a no responder, que es exactamente
+     * comerselo.
+     */
+    const amount = next.pendingDraw > 0 ? next.pendingDraw : 1;
+    const result = drawCards(next, player.id, amount);
     next = result.state;
     events.push({
       type: 'CARDS_DRAWN',
@@ -676,7 +748,7 @@ function applyTimeout(state: GameState, ctx: CommandContext, events: GameEvent[]
       count: result.cards.length,
       cards: result.cards,
     });
-    next = advanceTurn(next, ctx, events);
+    next = advanceTurn({ ...next, pendingDraw: 0 }, ctx, events);
   }
 
   const players = [...next.players];
@@ -722,7 +794,14 @@ function abandonPlayer(
   }
 
   if (next.currentPlayerIndex === index && next.phase !== 'round_over') {
-    next = advanceTurn(next, ctx, events);
+    /**
+     * El castigo NO se hereda: es de quien lo recibio.
+     *
+     * Si el que tenia un +6 encima abandona, el turno pasa al siguiente — que
+     * no tuvo nada que ver con ese duelo. Sin limpiarlo, se comeria un castigo
+     * ajeno, o quedaria obligado a responder una cadena que no empezo.
+     */
+    next = advanceTurn({ ...next, pendingDraw: 0 }, ctx, events);
   }
   return next;
 }

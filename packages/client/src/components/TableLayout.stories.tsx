@@ -23,7 +23,9 @@ function propsFor(playerCount: number, overrides: Parameters<typeof makeRedacted
   const state = makeRedactedState({ playerCount, ...overrides });
   const opponents = state.players.filter((p) => p.id !== state.you.id);
   const playable = new Set(
-    getPlayableCards(state.you.hand, state.activeColor, state.discardTop).map((c) => c.id),
+    getPlayableCards(state.you.hand, state.activeColor, state.discardTop, state.pendingDraw).map(
+      (c) => c.id,
+    ),
   );
 
   return {
@@ -223,5 +225,23 @@ export const RobasteYPodesPasar: Story = {
     ...propsFor(10, { currentSeat: 0 }),
     isMyTurn: true,
     canPass: true,
+  },
+};
+
+/**
+ * Te cayó una cadena de +2/+4 encima.
+ *
+ * El boton NO dice "Robar": dice cuanto te vas a comer, y se pone rojo. Con un
+ * castigo de 6, "Robar" a secas escondería el precio justo cuando es mas alto.
+ *
+ * Las unicas cartas jugables son +2/+4 —`isPlayable` lo restringe— asi que el
+ * resto de la mano se ve apagada.
+ */
+export const CastigoAcumulado: Story = {
+  args: {
+    ...propsFor(10, { currentSeat: 0 }),
+    isMyTurn: true,
+    pendingDraw: 6,
+    playable: new Set<string>(),
   },
 };

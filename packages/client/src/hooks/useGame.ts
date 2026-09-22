@@ -27,7 +27,9 @@ export function usePlayableCards(): Set<CardId> {
       return state.drawnCardId ? new Set([state.drawnCardId]) : EMPTY;
     }
     return new Set(
-      getPlayableCards(state.you.hand, state.activeColor, state.discardTop).map((c) => c.id),
+      getPlayableCards(state.you.hand, state.activeColor, state.discardTop, state.pendingDraw).map(
+        (c) => c.id,
+      ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);

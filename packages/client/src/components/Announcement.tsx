@@ -32,6 +32,14 @@ export interface Announcement {
   who?: string;
   /** Sentido nuevo. Solo para `reverse`. */
   direction?: 1 | -1;
+  /**
+   * Cartas del castigo. Solo para `draw2`/`draw4`.
+   *
+   * Existe por el apilado: antes el tipo de anuncio se deducia contando las
+   * cartas robadas (`>= 4` era un +4), lo que con una cadena de +2/+4 mostraba
+   * "+4" para un castigo de 8. El cartel tiene que decir lo que vas a robar.
+   */
+  amount?: number;
 }
 
 interface Look {
@@ -45,9 +53,19 @@ interface Look {
 function lookFor(a: Announcement): Look {
   switch (a.kind) {
     case 'draw4':
-      return { text: '+4', tone: 'text-white', tint: 'bg-white/10', glyph: Draw2Glyph };
+      return {
+        text: `+${a.amount ?? 4}`,
+        tone: 'text-white',
+        tint: 'bg-white/10',
+        glyph: Draw2Glyph,
+      };
     case 'draw2':
-      return { text: '+2', tone: 'text-uno-red', tint: 'bg-uno-red/15', glyph: Draw2Glyph };
+      return {
+        text: `+${a.amount ?? 2}`,
+        tone: 'text-uno-red',
+        tint: 'bg-uno-red/15',
+        glyph: Draw2Glyph,
+      };
     case 'reverse':
       return {
         text: 'CAMBIO DE SENTIDO',
