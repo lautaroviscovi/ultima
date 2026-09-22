@@ -26,12 +26,29 @@ pnpm --filter @uno/worker test
 ## Redesplegar el cliente
 
 ```bash
-vercel --prod
+vercel --prod --yes --scope lautaro-viscovis-projects
 ```
+
+El `--scope` no es opcional aunque `vercel whoami` responda bien: sin él el
+deploy falla con un `"Not authorized"` que parece sesión vencida y no lo es. El
+`orgId` que guarda `.vercel/project.json` no siempre resuelve solo.
 
 El `vercel.json` ya tiene el build command, el `outputDirectory` y **el rewrite
 SPA** — sin ese rewrite, `/room/XK4T` da 404 al recargar, que es el error de
 deploy más común con Vite + React Router.
+
+### Un cambio sólo-cliente NO corta las partidas
+
+Vale la pena comprobarlo antes de desplegar, porque cambia el riesgo por
+completo: si el backend no cambió, el Worker no se toca y nadie pierde su
+partida.
+
+```bash
+git diff --stat <ref-anterior> HEAD -- packages/engine packages/protocol packages/core packages/server packages/worker
+```
+
+Vacío significa que alcanza con desplegar Vercel. Todo el rediseño visual
+(fases 1-7) entró así.
 
 ---
 
@@ -111,6 +128,13 @@ libera). Esto también devuelve el código al pool: el flag `claimed` se persist
 para que dos `/claim` no colisionen, así que sin liberarlo cada partida
 consumiría un código del espacio de ~920k para siempre.
 
+**Cerrar la pestaña no alcanza para liberar una sala.** Un jugador
+desconectado sigue contando: su asiento queda reservado para que pueda volver
+con el token, que es lo que hace que la reconexión funcione. Así que una sala
+recién abandonada devuelve 409 igual, y hay que esperar el TTL. No es un
+problema en la práctica — los códigos nuevos salen de otro lado del espacio —
+pero explica por qué un `release` inmediato después de probar "no funciona".
+
 ### Logs
 
 ```bash
@@ -130,6 +154,14 @@ que el dominio esté _exacto_, con `https://` y sin barra final, y que el Worker
 se haya redesplegado después de cambiarlo.
 
 **`/room/XK4T` da 404 al recargar.** Falta el rewrite SPA en `vercel.json`.
+
+**`vercel --prod` responde `"Not authorized"`.** No es la sesión: `vercel
+whoami` sigue respondiendo con tu usuario. Falta el scope, que el `orgId` de
+`.vercel/project.json` no siempre resuelve solo.
+
+```bash
+vercel --prod --yes --scope lautaro-viscovis-projects
+```
 
 **Un dominio recién creado no resuelve.** El caché DNS local puede tener un
 `NXDOMAIN` viejo. Se arregla solo en unos minutos, o con
