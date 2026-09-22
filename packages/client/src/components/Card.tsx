@@ -48,13 +48,22 @@ const FG: Record<Color, string> = {
   blue: 'text-white',
 };
 
-/** Glifo central. Los simbolos se dibujan, no se escriben con texto. */
+/**
+ * Glifo central. Los simbolos se dibujan, no se escriben con texto.
+ *
+ * Las cifras van en `font-display` (Outfit) y con `tabular-nums`: dentro de un
+ * ovalo lo que importa es que el numero se centre en su caja y que un "10" no
+ * mida distinto que un "11", porque si no el abanico tiembla al cambiar la
+ * mano. Los tamaños `figure-*` ya traen line-height 1 por eso mismo.
+ */
 function Face({ card, size }: { card: CardModel; size: CardSize }): JSX.Element {
-  const big = size === 'lg' ? 'text-4xl' : size === 'md' ? 'text-2xl' : 'text-base';
+  const big =
+    size === 'lg' ? 'text-figure-lg' : size === 'md' ? 'text-figure-md' : 'text-figure-sm';
+  const figure = `${big} font-display tabular-nums`;
 
   switch (card.kind) {
     case 'number':
-      return <span className={`${big} font-black leading-none`}>{card.value}</span>;
+      return <span className={`${figure} font-black`}>{card.value}</span>;
     case 'skip':
       return (
         <span className={`${big} font-black leading-none`} aria-hidden>
@@ -68,7 +77,7 @@ function Face({ card, size }: { card: CardModel; size: CardSize }): JSX.Element 
         </span>
       );
     case 'draw2':
-      return <span className={`${big} font-black leading-none`}>+2</span>;
+      return <span className={`${figure} font-black`}>+2</span>;
     case 'wild':
       // Cuatro cuadrantes: es el glifo que todos reconocen del wild.
       return (
@@ -88,7 +97,11 @@ function Face({ card, size }: { card: CardModel; size: CardSize }): JSX.Element 
             <i className="block h-2 w-2 rounded-sm bg-uno-yellow" />
             <i className="block h-2 w-2 rounded-sm bg-uno-green" />
           </span>
-          <span className={`${size === 'sm' ? 'text-[0.6rem]' : 'text-lg'} font-black mt-0.5`}>
+          <span
+            className={`font-display font-black tabular-nums mt-0.5 ${
+              size === 'sm' ? 'text-micro' : 'text-figure-sm'
+            }`}
+          >
             +4
           </span>
         </span>

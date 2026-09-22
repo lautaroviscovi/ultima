@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { DURATION, SPRING } from '../design/motion.js';
 
 /**
  * Destello de pantalla completa al invertirse el sentido.
@@ -7,15 +8,15 @@ import { AnimatePresence, motion } from 'framer-motion';
  * reverse cambia quien sigue y si pasa desapercibido la gente juega fuera de
  * turno y se frustra. No bloquea nada — es puramente visual y dura medio
  * segundo.
+ *
+ * No recibe `reducedMotion`: el MotionConfig del arbol ya lo aplica.
  */
 export function ReverseFlash({
   show,
   direction,
-  reducedMotion = false,
 }: {
   show: boolean;
   direction: 1 | -1;
-  reducedMotion?: boolean;
 }): JSX.Element {
   return (
     <AnimatePresence>
@@ -26,14 +27,14 @@ export function ReverseFlash({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: reducedMotion ? 0 : 0.2 }}
+          transition={{ duration: DURATION.quick }}
         >
           <div className="absolute inset-0 bg-uno-yellow/15" />
           <motion.p
-            className="rounded-2xl bg-black/70 px-8 py-4 text-3xl font-black text-uno-yellow"
-            initial={reducedMotion ? { scale: 1 } : { scale: 0.5, rotate: -12 }}
-            animate={reducedMotion ? { scale: 1 } : { scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+            className="rounded-2xl bg-scrim px-8 py-4 font-display text-display font-black text-uno-yellow"
+            initial={{ scale: 0.5, rotate: -12 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={SPRING.pop}
           >
             {direction === 1 ? '↻' : '↺'} CAMBIO DE SENTIDO
           </motion.p>

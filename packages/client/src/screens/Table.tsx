@@ -267,7 +267,6 @@ export function Table(): JSX.Element {
           isMyTurn={isMyTurn}
           unoWindowFor={unoWindowFor}
           reverseFlash={reverseFlash}
-          reducedMotion={reducedMotion}
           onPlay={handlePlay}
           onDraw={handleDraw}
           onCallOut={handleCallOut}

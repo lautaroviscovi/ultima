@@ -12,6 +12,8 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/outfit": "^5.3.0",
     "@uno/engine": "workspace:*",
     "@uno/protocol": "workspace:*",
     "framer-motion": "^13.4.0",

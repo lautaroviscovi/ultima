@@ -1,0 +1,129 @@
+/**
+ * Tokens del sistema de diseño.
+ *
+ * Los colores se declaran como CANALES sueltos (`215 38 0`) y no como `#D72600`
+ * ni `rgb(...)`. Eso es lo que permite escribir `rgb(var(--uno-red) / 0.55)` y
+ * derivar cualquier opacidad del mismo token — que es como desaparecen los
+ * `shadow-[0_0_20px_rgba(215,38,0,0.55)]` con los canales reescritos a mano.
+ */
+
+:root {
+  /* ---------------------------------------------------------------------
+   * PIGMENTO — el color de las cartas.
+   *
+   * Uso permitido: la cara de la carta, el swatch del ColorPicker, el halo de
+   * color activo y el glifo wild. Nada más. Si un `uno-*` aparece fuera de
+   * Card, ColorPicker, DiscardPile (halo) o palette, está mal.
+   * ------------------------------------------------------------------- */
+  --uno-red: 215 38 0;
+  --uno-yellow: 232 176 0;
+  --uno-green: 0 166 81;
+  --uno-blue: 0 130 206;
+
+  /* ---------------------------------------------------------------------
+   * INTENCIÓN — lo que el color SIGNIFICA en la interfaz.
+   *
+   * Deliberadamente cercanos a los pigmentos pero NO idénticos, porque los
+   * pigmentos están elegidos para leerse sobre blanco (la cara de la carta) y
+   * estos tienen que leerse sobre el fieltro verde.
+   * ------------------------------------------------------------------- */
+
+  /* Más claro que --uno-green: el verde de carta sobre fieltro verde es
+   * invisible, y ese es un bug real hoy en ConnectionBadge. */
+  --intent-ok: 34 197 94;
+  --intent-warn: 245 158 11;
+  --intent-danger: 239 68 68;
+
+  /* Celeste, NO el azul de carta: un anillo de foco azul-carta desaparece
+   * justo encima de una carta azul, que es donde más falta hace. */
+  --intent-focus: 125 211 252;
+
+  /* El timer por vencer. Más rojo que --intent-danger porque compite con
+   * mucha información alrededor. */
+  --intent-urgent: 248 113 113;
+
+  /* ---------------------------------------------------------------------
+   * MARCA — ÚLTIMA.
+   * ------------------------------------------------------------------- */
+  --brand-accent: 250 204 21;
+  --brand-ink: 15 26 20;
+
+  /* ---------------------------------------------------------------------
+   * FIELTRO — el fondo sobre el que se define todo lo demás.
+   * ------------------------------------------------------------------- */
+  --felt: 20 83 45;
+  --felt-dark: 11 58 32;
+
+  /* ---------------------------------------------------------------------
+   * SUPERFICIES — por elevación sobre el fieltro.
+   *
+   * Son colores completos (no canales) porque ya llevan su alpha horneada:
+   * el punto de la escala es que la elevación sea una decisión tomada, no un
+   * `bg-white/5 | /10 | /15` elegido carta por carta.
+   * ------------------------------------------------------------------- */
+  --surface-sunken: rgb(0 0 0 / 0.28);
+  --surface-raised: rgb(255 255 255 / 0.06);
+  --surface-raised-hover: rgb(255 255 255 / 0.12);
+  --surface-active: rgb(255 255 255 / 0.18);
+
+  /* Tintado HACIA el fieltro, no negro puro: un scrim negro sobre verde se ve
+   * sucio, uno verde oscuro se lee como sombra de la misma mesa. */
+  --surface-scrim: rgb(6 30 17 / 0.72);
+
+  /* Opaca. Reemplaza el `bg-neutral-900` fuera de paleta de los modales y del
+   * dorso de la carta. */
+  --surface-overlay: #0f1a14;
+
+  --border-subtle: rgb(255 255 255 / 0.1);
+  --border-strong: rgb(255 255 255 / 0.22);
+
+  /* ---------------------------------------------------------------------
+   * SOMBRAS.
+   *
+   * --glow-color es el parámetro: un componente lo setea inline
+   * (`style={{ '--glow-color': 'var(--uno-red)' }}`) y usa `shadow-glow`. Eso
+   * es lo que mata los literales rgba con los canales escritos a mano.
+   * ------------------------------------------------------------------- */
+  --glow-color: var(--brand-accent);
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 10px rgb(0 0 0 / 0.28);
+  --shadow-card-lift: 0 4px 8px rgb(0 0 0 / 0.32), 0 12px 28px rgb(0 0 0 / 0.38);
+  --shadow-seat: 0 2px 8px rgb(0 0 0 / 0.35);
+  --shadow-modal: 0 24px 64px rgb(0 0 0 / 0.55);
+  --shadow-glow: 0 0 24px rgb(var(--glow-color) / 0.55);
+
+  /* ---------------------------------------------------------------------
+   * LA CARTA — una sola variable de la que sale todo lo demás.
+   *
+   * Ratio 5:8 = 1.6 uniforme en los tres tamaños. Hoy `sm` tiene otro ratio
+   * que `md`/`lg`, y por eso el dorso del asiento se ve más gordo que la
+   * carta de tu mano.
+   * ------------------------------------------------------------------- */
+  --card-ratio: 1.6;
+  --card-w-sm: 40px;
+  --card-w-md: 60px;
+  --card-w-lg: 90px;
+}
+
+/**
+ * Movimiento reducido, de una vez y para todo.
+ *
+ * Framer Motion ya lo respeta vía el MotionConfig de Table.tsx, pero las
+ * animaciones y transiciones CSS (animate-pulse, todos los transition-*) no lo
+ * respetaban en ningún lado. No es decorativo: para alguien con sensibilidad
+ * vestibular esto es la diferencia entre poder jugar y marearse.
+ *
+ * Duración ~0 en vez de `none`: el estado FINAL sigue siendo el mismo y nada
+ * queda a medio camino. Con `animation: none` un `animate-pulse` podría quedar
+ * congelado en opacidad 0 — invisible.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

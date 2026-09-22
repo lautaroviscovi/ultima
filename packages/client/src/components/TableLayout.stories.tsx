@@ -123,9 +123,15 @@ export const SentidoInvertido: Story = {
 };
 
 /**
- * Movimiento reducido: las transiciones pasan a duracion 0 pero el estado
+ * Movimiento reducido: las transiciones pasan a duracion ~0 pero el estado
  * final es el mismo. Nada queda a medio camino.
+ *
+ * Ya no se pasa por prop — la preferencia vive en el MotionConfig del arbol
+ * (en la app, leida del sistema; aca, del toolbar "Movimiento"). Esta story
+ * fija ese global para que el caso quede documentado sin depender de que
+ * alguien mueva el toolbar.
  */
 export const MovimientoReducido: Story = {
-  args: { ...propsFor(10), reducedMotion: true, reverseFlash: true },
+  args: { ...propsFor(10), reverseFlash: true },
+  globals: { motion: 'reduced' },
 };

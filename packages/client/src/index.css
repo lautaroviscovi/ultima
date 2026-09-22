@@ -1,6 +1,102 @@
+@import './design/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/**
+ * Fuentes self-hosted (no Google Fonts por CDN): evita un origen extra y un
+ * round-trip en la primera carga. Los archivos entran al bundle de Vite.
+ *
+ * Los @font-face se declaran a mano en vez de importar el CSS del paquete
+ * porque ese importa NUEVE subsets — cirilico, griego y vietnamita incluidos —
+ * y son ~265KB de los cuales el juego usa 95KB. La UI esta en español: alcanza
+ * con latin y latin-ext. Declararlos a mano tambien deja poner el
+ * `font-display: swap` explicito, que es lo que evita el texto invisible
+ * mientras la fuente carga.
+ */
+@font-face {
+  font-family: 'Outfit Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/outfit/files/outfit-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Outfit Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/outfit/files/outfit-latin-ext-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/inter/files/inter-latin-ext-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/**
+ * Metricas de fallback — esto es lo que evita el salto al cargar la fuente.
+ *
+ * Sin `size-adjust`, la primera carga dibuja las cartas con la fuente del
+ * sistema a otro ancho y despues SALTAN. Con 10 cartas en mano es muy visible.
+ *
+ * Los porcentajes estan MEDIDOS, no estimados: se comparo el ancho de
+ * "0123456789" a 32px/800 (el caso de la cifra en la carta) y de una linea de
+ * UI a 16px/400 contra Arial, en este mismo navegador. Outfit resulto casi
+ * identica a Arial en ancho — de ahi el 100.7%, que a ojo uno no elegiria.
+ *
+ * Si algun dia se cambia de familia hay que volver a medir: un valor heredado
+ * de otra fuente es peor que no poner ninguno, porque agrega un salto que sin
+ * el no existiria.
+ */
+@font-face {
+  font-family: 'Outfit Fallback';
+  src: local('Arial');
+  size-adjust: 100.7%;
+  ascent-override: 100%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial');
+  size-adjust: 106%;
+  ascent-override: 90%;
+  descent-override: 22%;
+  line-gap-override: 0%;
+}
 
 html,
 body,
@@ -10,11 +106,20 @@ body,
 
 body {
   margin: 0;
-  font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
+  font-family: theme('fontFamily.sans');
+  background: rgb(var(--felt-dark));
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/**
+ * Foco visible, una sola vez para toda la app.
+ *
+ * `focus-visible` y no `focus`: el anillo aparece al navegar con teclado y no
+ * al hacer click. La carta es un <button> y hoy no tiene ningun indicador.
+ */
+:focus-visible {
+  outline: 2px solid rgb(var(--intent-focus));
+  outline-offset: 2px;
+  border-radius: 4px;
 }

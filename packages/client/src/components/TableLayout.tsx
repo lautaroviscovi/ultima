@@ -24,7 +24,6 @@ export interface TableLayoutProps {
   isMyTurn?: boolean;
   unoWindowFor?: string | null;
   reverseFlash?: boolean;
-  reducedMotion?: boolean;
   onPlay?: (card: CardModel) => void;
   onDraw?: () => void;
   onCallOut?: (playerId: string) => void;
@@ -50,7 +49,6 @@ export function TableLayout({
   isMyTurn = false,
   unoWindowFor = null,
   reverseFlash = false,
-  reducedMotion = false,
   onPlay,
   onDraw,
   onCallOut,
@@ -93,11 +91,7 @@ export function TableLayout({
 
           <div className="absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2">
             <div className="flex flex-col items-center gap-2">
-              <DirectionIndicator
-                direction={direction}
-                flash={reverseFlash}
-                reducedMotion={reducedMotion}
-              />
+              <DirectionIndicator direction={direction} flash={reverseFlash} />
               <DiscardPile
                 top={discardTop}
                 activeColor={activeColor}
@@ -158,7 +152,7 @@ export function TableLayout({
           />
         </div>
 
-        <ReverseFlash show={reverseFlash} direction={direction} reducedMotion={reducedMotion} />
+        <ReverseFlash show={reverseFlash} direction={direction} />
 
         <span className="sr-only">Sos {myId}</span>
       </div>
