@@ -427,6 +427,33 @@ describe('UNO', () => {
     expect(next.players[0]!.hasDeclaredUno).toBe(true);
   });
 
+  /**
+   * La ventana tiene `closesAt`, y hasta ahora NADIE lo respetaba: el comando
+   * `CLOSE_UNO_WINDOW` existia y el unico que podia emitirlo —
+   * `RoomManager.closeUnoWindow`— no lo llamaba nadie.
+   *
+   * No se notaba porque el cliente cantaba ÚLTIMA solo, asi que la ventana no
+   * se abria jamas. Al sacar ese auto-canto, sin esto la ventana quedaria
+   * abierta hasta el fin de la ronda: te podrian acusar cinco turnos despues.
+   */
+  it('EL BUG: la ventana se cierra y ya no se puede acusar', () => {
+    const card = num('red', 5);
+    const state = makeState({
+      hands: [[card, num('blue', 2)], [num('blue', 1)], [num('blue', 3)]],
+      discardPile: [num('red', 3)],
+    });
+    const { state: played } = apply(state, { type: 'PLAY_CARD', cardId: card.id }, 'p0', 1000);
+    expect(played.unoWindow?.playerId).toBe('p0');
+
+    const { state: closed } = apply(played, { type: 'CLOSE_UNO_WINDOW' }, null, 5000);
+    expect(closed.unoWindow).toBeNull();
+
+    // Acusar despues de cerrada no hace nada: la mano sigue en 1.
+    const { state: after } = apply(closed, { type: 'CALL_OUT_UNO', targetId: 'p0' }, 'p1', 6000);
+    expect(after.players[0]!.hand).toHaveLength(1);
+    expect(after.players[0]!.hasDeclaredUno).toBe(false);
+  });
+
   it('acusar a quien no declaro le hace robar 2', () => {
     const card = num('red', 5);
     const state = makeState({

@@ -25,6 +25,8 @@ export interface TableLayoutProps {
   secondsLeft?: number;
   isMyTurn?: boolean;
   unoWindowFor?: string | null;
+  /** Ya cantaste ÚLTIMA y todavia no jugaste. */
+  unoArmed?: boolean;
   reverseFlash?: boolean;
   onPlay?: (card: CardModel) => void;
   onDraw?: () => void;
@@ -50,6 +52,7 @@ export function TableLayout({
   secondsLeft,
   isMyTurn = false,
   unoWindowFor = null,
+  unoArmed = false,
   reverseFlash = false,
   onPlay,
   onDraw,
@@ -148,6 +151,7 @@ export function TableLayout({
 
             <HandActions
               aboutToWin={aboutToWin}
+              armed={unoArmed}
               {...(onDeclareUno ? { onDeclareUno } : {})}
               {...(callOut ? { callOut } : {})}
               {...(onCallOut ? { onCallOut } : {})}

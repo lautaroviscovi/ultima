@@ -71,6 +71,9 @@ export function Table(): JSX.Element {
   const cardsInFlight = useUIStore((s) => s.cardsInFlight);
   const openColorPicker = useUIStore((s) => s.openColorPicker);
   const closeColorPicker = useUIStore((s) => s.closeColorPicker);
+  const unoArmed = useUIStore((s) => s.unoArmed);
+  const armUno = useUIStore((s) => s.armUno);
+  const disarmUno = useUIStore((s) => s.disarmUno);
 
   // Sin sesion no hay asiento que reclamar.
   useEffect(() => {
@@ -111,14 +114,25 @@ export function Table(): JSX.Element {
         return;
       }
 
-      // declareUno va en el MISMO comando que la jugada: eso elimina la carrera
-      // de red donde declaras legitimamente pero el paquete llega tarde.
-      const declaring = hand.length === 2;
+      /**
+       * `declareUno` sale de lo que el JUGADOR decidio, no de contar cartas.
+       *
+       * Antes era `hand.length === 2`, o sea que el cliente cantaba solo cada
+       * vez que jugabas tu penultima carta. Nunca te podias olvidar — y como
+       * el engine solo abre la ventana de acusacion si NO cantaste, esa
+       * ventana no se abria jamas: acusar era imposible y el boton ¡ÚLTIMA!
+       * era decorativo.
+       *
+       * Sigue viajando EN el mismo comando que la jugada, que es lo que evita
+       * la carrera de red donde cantas y el paquete llega tarde.
+       */
+      const declaring = unoArmed;
+      disarmUno();
       void (fromDrawn
         ? playDrawnCard({ declareUno: declaring })
         : playCard(card.id, { declareUno: declaring }));
     },
-    [state, hand.length, openColorPicker],
+    [state, openColorPicker, unoArmed, disarmUno],
   );
 
   const handleColorPick = useCallback(
@@ -139,21 +153,32 @@ export function Table(): JSX.Element {
 
       // Con carta pendiente, el color viaja EN el mismo comando que la jugada:
       // un round-trip menos y sin pasar por la fase choosing_color.
-      const declaring = hand.length === 2;
+      const declaring = unoArmed;
+      disarmUno();
       void (state.phase === 'card_drawn'
         ? playDrawnCard({ chosenColor: color, declareUno: declaring })
         : playCard(cardId, { chosenColor: color, declareUno: declaring }));
     },
-    [pendingWildCardId, closeColorPicker, state, hand.length],
+    [pendingWildCardId, closeColorPicker, state, unoArmed, disarmUno],
   );
 
   const handleDraw = useCallback(() => {
     void drawCard();
   }, []);
 
+  /**
+   * Cantar ÚLTIMA.
+   *
+   * Hace las dos cosas: manda el comando suelto (por si cantas y tardas en
+   * jugar) y arma la intencion para que la proxima jugada viaje con
+   * `declareUno: true`. Mandar solo el comando dejaria una ventana entre
+   * cantar y jugar; armar solo la intencion no cubriria al que canta y despues
+   * se toma su tiempo.
+   */
   const handleDeclareUno = useCallback(() => {
+    armUno();
     void declareUno();
-  }, []);
+  }, [armUno]);
 
   const handleCallOut = useCallback((playerId: string) => {
     void callOutUno(playerId);
@@ -263,6 +288,7 @@ export function Table(): JSX.Element {
           secondsLeft={timer.secondsLeft}
           isMyTurn={isMyTurn}
           unoWindowFor={unoWindowFor}
+          unoArmed={unoArmed}
           reverseFlash={reverseFlash}
           onPlay={handlePlay}
           onDraw={handleDraw}

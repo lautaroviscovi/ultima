@@ -143,20 +143,59 @@ export class Gateway {
     }
   }
 
-  /** Turno expirado. Lo dispara el scheduler del servidor, nunca un cliente. */
+  /**
+   * Vencio un plazo. Puede ser el turno o la ventana de ÚLTIMA.
+   *
+   * Hay UN solo timer por sala, asi que al dispararse hay que ver que venció
+   * de verdad. La ventana suele ser mucho mas corta (3s contra 45s), asi que
+   * casi siempre vence primero y el turno se reagenda despues.
+   */
   handleTurnExpired(roomId: string): void {
     const { rooms, scheduler, now } = this.deps;
-    const result = rooms.applyTimeout(roomId, now());
+    const at = now();
     const room = rooms.find(roomId);
-    if (!result || !room?.game) {
+
+    /**
+     * La ventana de acusacion primero.
+     *
+     * `closeUnoWindow` existia en RoomManager desde el port y **nadie lo
+     * llamaba**: la ventana se calculaba con su `closesAt` y nunca expiraba.
+     * No se notaba porque el cliente cantaba ÚLTIMA solo, asi que la ventana
+     * jamas se abria. Al sacar ese auto-canto, sin esto la ventana quedaria
+     * abierta hasta el fin de la ronda — te podrian acusar cinco turnos
+     * despues de la jugada.
+     */
+    const window = room?.game?.unoWindow;
+    if (window && window.closesAt <= at) {
+      const closed = rooms.closeUnoWindow(roomId, at);
+      if (closed && room) {
+        for (const effect of closed.effects) {
+          if (effect.kind === 'state:patch') this.broadcastState(room, effect.events);
+        }
+      }
+      // `broadcastState` reagenda solo; si no hubo efectos, reagendamos aca.
+      if (!closed && room) this.rescheduleTurn(room);
+      return;
+    }
+
+    const result = rooms.applyTimeout(roomId, at);
+    const after = rooms.find(roomId);
+    if (!result || !after?.game) {
       scheduler.cancel(roomId);
       return;
     }
     for (const effect of result.effects) {
-      if (effect.kind === 'state:patch') this.broadcastState(room, effect.events);
+      if (effect.kind === 'state:patch') this.broadcastState(after, effect.events);
     }
   }
 
+  /**
+   * Reagenda el unico timer de la sala.
+   *
+   * Apunta al plazo mas CERCANO entre el turno y la ventana de ÚLTIMA. Si
+   * apuntara solo al turno, la ventana no venceria nunca; si apuntara solo a
+   * la ventana, el turno dejaria de expirar — que seria peor.
+   */
   private rescheduleTurn(room: Room): void {
     const { scheduler, now } = this.deps;
     const game = room.game;
@@ -164,7 +203,11 @@ export class Gateway {
       scheduler.cancel(room.id);
       return;
     }
-    scheduler.schedule(room.id, game.turnDeadline, now());
+    const deadline =
+      game.unoWindow !== null
+        ? Math.min(game.turnDeadline, game.unoWindow.closesAt)
+        : game.turnDeadline;
+    scheduler.schedule(room.id, deadline, now());
   }
 
   /**

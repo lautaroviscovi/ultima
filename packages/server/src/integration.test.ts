@@ -545,6 +545,66 @@ describe.each(TRANSPORTS)('transporte %s', (transport) => {
     });
   });
 
+  describe('ventana de ÚLTIMA', () => {
+    /**
+     * EL BUG: `closeUnoWindow` existia en RoomManager y **nadie lo llamaba**.
+     *
+     * La ventana se abria con un `closesAt` que ningun timer respetaba, asi
+     * que quedaba abierta hasta el fin de la ronda: te podian acusar cinco
+     * turnos despues de la jugada.
+     *
+     * No se notaba porque el cliente cantaba ÚLTIMA solo y la ventana no se
+     * abria jamas. Al sacar ese auto-canto, esto quedo expuesto.
+     */
+    it('EL BUG: la ventana expira por tiempo', async () => {
+      // El schema exige unoWindowMs >= 1000, asi que no se puede pedir una
+      // ventana instantanea: se fuerza el `closesAt` en el pasado.
+      const { host, all } = await lobby(3, { unoWindowMs: 1000 });
+      await startAndSettle(host, all, { unoWindowMs: 1000 });
+
+      // Forzamos una ventana abierta manipulando el estado del engine: llegar
+      // a 1 carta jugando de verdad tomaria decenas de turnos.
+      const room = app.rooms.find(host.roomId!)!;
+      const game = room.game!;
+      const victim = game.players[0]!;
+      room.game = {
+        ...game,
+        unoWindow: { playerId: victim.id, closesAt: Date.now() - 10 },
+      };
+
+      // El scheduler dispara: con la ventana vencida, tiene que cerrarla.
+      app.gateway.handleTurnExpired(host.roomId!);
+
+      await host.waitFor(
+        () => app.rooms.find(host.roomId!)?.game?.unoWindow === null,
+        2000,
+        'la ventana se cierra sola',
+      );
+      expect(app.rooms.find(host.roomId!)?.game?.unoWindow).toBeNull();
+    });
+
+    /**
+     * El riesgo del arreglo: hay UN solo timer por sala. Si la ventana se
+     * queda con el, el turno deja de vencer — que seria peor que el bug.
+     */
+    it('EL RIESGO: el turno sigue venciendo con la ventana cerrada', async () => {
+      const { host, all } = await lobby(3, { turnTimeoutMs: 10_000 });
+      await startAndSettle(host, all, { turnTimeoutMs: 10_000 });
+
+      const first = host.state!.currentPlayerId;
+      expect(app.rooms.find(host.roomId!)?.game?.unoWindow).toBeNull();
+
+      app.gateway.handleTurnExpired(host.roomId!);
+
+      await host.waitFor(
+        () => host.state?.currentPlayerId !== first,
+        2000,
+        'el turno sigue venciendo',
+      );
+      expect(host.events.some((e) => e.type === 'PLAYER_TIMED_OUT')).toBe(true);
+    });
+  });
+
   describe('rate limiting', () => {
     it('frena la creacion masiva de salas desde un mismo socket', async () => {
       // Con el estado en memoria y sin base de datos, crear salas sin parar es

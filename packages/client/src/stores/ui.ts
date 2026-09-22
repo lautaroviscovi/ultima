@@ -21,6 +21,18 @@ export interface UIState {
   cardsInFlight: Set<CardId>;
   handSortMode: HandSortMode;
   soundEnabled: boolean;
+  /**
+   * Tocaste ¡ÚLTIMA! y todavia no jugaste.
+   *
+   * Existe porque cantar y jugar son DOS acciones del jugador que viajan en UN
+   * solo comando: `declareUno` va junto con la jugada para que no haya una
+   * carrera de red donde cantas legitimamente y el paquete llega tarde.
+   *
+   * Antes esto se derivaba de `hand.length === 2`, o sea que el cliente
+   * cantaba SOLO. Como el engine solo abre la ventana de acusacion si NO
+   * cantaste, esa ventana no se abria nunca y acusar era imposible.
+   */
+  unoArmed: boolean;
 
   openColorPicker(cardId: CardId): void;
   closeColorPicker(): void;
@@ -28,6 +40,8 @@ export interface UIState {
   unmarkInFlight(cardId: CardId): void;
   setSortMode(mode: HandSortMode): void;
   toggleSound(): void;
+  armUno(): void;
+  disarmUno(): void;
   reset(): void;
 }
 
@@ -37,6 +51,7 @@ const initial = {
   cardsInFlight: new Set<CardId>(),
   handSortMode: 'draw' as HandSortMode,
   soundEnabled: true,
+  unoArmed: false,
 };
 
 export const useUIStore = create<UIState>()((set) => ({
@@ -57,6 +72,10 @@ export const useUIStore = create<UIState>()((set) => ({
 
   setSortMode: (handSortMode) => set({ handSortMode }),
   toggleSound: () => set((state) => ({ soundEnabled: !state.soundEnabled })),
+
+  armUno: () => set({ unoArmed: true }),
+  /** Se desarma al jugar (ya viajo) y al quedar fuera de la ventana. */
+  disarmUno: () => set({ unoArmed: false }),
 
   reset: () => set({ ...initial, cardsInFlight: new Set() }),
 }));

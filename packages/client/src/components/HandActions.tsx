@@ -4,6 +4,8 @@ import { DURATION, SPRING } from '../design/motion.js';
 export interface HandActionsProps {
   /** Te queda una carta despues de jugar: podes cantar. */
   aboutToWin?: boolean;
+  /** Ya cantaste y todavia no jugaste. */
+  armed?: boolean;
   onDeclareUno?: () => void;
   /** A quien se le puede acusar el ÚLTIMA no cantado, si la ventana esta abierta. */
   callOut?: { playerId: string; nickname: string } | null;
@@ -27,6 +29,7 @@ export interface HandActionsProps {
  */
 export function HandActions({
   aboutToWin = false,
+  armed = false,
   onDeclareUno,
   callOut = null,
   onCallOut,
@@ -65,20 +68,26 @@ export function HandActions({
         disabled={!aboutToWin}
         // El boton se ilumina ANTES de quedar en una: declarar junto con la
         // jugada elimina la carrera de red que arruina la experiencia.
-        animate={aboutToWin ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+        animate={aboutToWin && !armed ? { scale: [1, 1.06, 1] } : { scale: 1 }}
         transition={
-          aboutToWin
+          aboutToWin && !armed
             ? { duration: 1.1, repeat: Infinity, ease: 'easeInOut' }
             : { duration: DURATION.quick }
         }
         className={`rounded-full px-5 py-1.5 font-display text-body font-black transition-colors
                     ${
-                      aboutToWin
-                        ? 'bg-brand-accent text-brand-ink shadow-card-lift'
-                        : 'bg-raised text-white/25'
+                      armed
+                        ? 'bg-intent-ok text-brand-ink shadow-card-lift ring-2 ring-white/40'
+                        : aboutToWin
+                          ? 'bg-brand-accent text-brand-ink shadow-card-lift'
+                          : 'bg-raised text-white/25'
                     }`}
       >
-        ¡ÚLTIMA!
+        {/*
+          Cantado tiene que VERSE. Si tocar el boton no cambiara nada, el
+          jugador no sabria si canto — y de eso depende que lo puedan acusar.
+        */}
+        {armed ? '¡ÚLTIMA! ✓' : '¡ÚLTIMA!'}
       </motion.button>
     </div>
   );
