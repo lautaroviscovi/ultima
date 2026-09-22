@@ -202,6 +202,52 @@ describe('useGameMoments', () => {
     });
   });
 
+  describe('destello del cambio de sentido', () => {
+    /**
+     * EL BUG QUE SE VIO JUGANDO: el destello se repetia en CADA carta.
+     *
+     * La version vieja vivia en `Table.tsx` y comparaba `state.direction`
+     * contra una ref. La rama que detectaba el cambio salia con un `return`
+     * antes de actualizar la ref, asi que quedaba congelada en la direccion
+     * vieja — y como el efecto dependia de `state` (objeto nuevo en cada
+     * patch), la condicion daba verdadera para siempre.
+     *
+     * Derivado del evento, esto es imposible: un evento pasa una sola vez.
+     */
+    it('EL BUG: no se repite en las jugadas siguientes', () => {
+      vi.useFakeTimers();
+      const { result } = renderHook(() => useGameMoments());
+
+      emit('me', [{ type: 'DIRECTION_REVERSED', direction: -1 }]);
+      expect(result.current.reverseFlash).toBe(true);
+
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      expect(result.current.reverseFlash).toBe(false);
+
+      // Tres cartas mas SIN reverse: el destello no puede volver.
+      for (const _ of [1, 2, 3]) {
+        emit('me', [{ type: 'CARD_PLAYED', playerId: 'rival', card: card('x') }]);
+        expect(result.current.reverseFlash, 'volvio a destellar sin reverse').toBe(false);
+      }
+    });
+
+    it('vuelve a destellar si hay OTRO reverse', () => {
+      vi.useFakeTimers();
+      const { result } = renderHook(() => useGameMoments());
+
+      emit('me', [{ type: 'DIRECTION_REVERSED', direction: -1 }]);
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      expect(result.current.reverseFlash).toBe(false);
+
+      emit('me', [{ type: 'DIRECTION_REVERSED', direction: 1 }]);
+      expect(result.current.reverseFlash).toBe(true);
+    });
+  });
+
   it('dos robos de la MISMA carta no colisionan de clave', () => {
     // Pasa tras un rebarajado: la carta vuelve al mazo y se roba otra vez.
     vi.useFakeTimers();

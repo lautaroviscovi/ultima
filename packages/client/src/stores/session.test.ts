@@ -54,13 +54,41 @@ describe('useSessionStore', () => {
     expect(sessionStorage.getItem('uno:session') ?? '').not.toContain('Lautaro');
   });
 
-  it('recorta y limita el nickname', () => {
+  /**
+   * EL BUG QUE SE VIO JUGANDO: no se podia escribir "Juan Pérez".
+   *
+   * El store hacia `trim()` al guardar, y `Home.tsx` lo llama en CADA tecla
+   * sobre un input controlado. Al apretar la barra espaciadora despues de
+   * "Juan", el valor pasaba a "Juan ", el trim lo volvia a "Juan", y la
+   * segunda palabra nunca podia empezar.
+   *
+   * El test viejo pasaba igual porque probaba espacios en los EXTREMOS
+   * (`'   Lautaro   '`), nunca en el medio — o sea, daba falsa confianza
+   * sobre justo el caso que fallaba.
+   */
+  it('EL BUG: deja escribir un nombre con espacios', () => {
     const store = useSessionStore.getState();
-    store.setNickname('   Lautaro   ');
-    expect(useSessionStore.getState().nickname).toBe('Lautaro');
+
+    // Tecla por tecla, como escribe una persona.
+    for (const value of ['J', 'Ju', 'Jua', 'Juan', 'Juan ', 'Juan P']) {
+      store.setNickname(value);
+      expect(useSessionStore.getState().nickname).toBe(value);
+    }
+
+    store.setNickname('Juan Pérez');
+    expect(useSessionStore.getState().nickname).toBe('Juan Pérez');
+  });
+
+  it('acota el largo, pero no toca el contenido', () => {
+    const store = useSessionStore.getState();
 
     store.setNickname('x'.repeat(50));
     expect(useSessionStore.getState().nickname).toHaveLength(20);
+
+    // El recorte de extremos es responsabilidad de quien ENVIA, no del store:
+    // recortar mientras se tipea es lo que rompia los espacios.
+    store.setNickname('  Lautaro  ');
+    expect(useSessionStore.getState().nickname).toBe('  Lautaro  ');
   });
 
   it('olvida una sala sin tocar las demas', () => {

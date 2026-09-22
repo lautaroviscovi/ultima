@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { GameEvent, RedactedGameState } from '@uno/engine';
 import type { ProtocolErrorCode, RedactedRoomState } from '@uno/protocol';
+import { shouldShowError } from '../net/errorCopy.js';
 
 export type ConnectionStatus =
   'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
@@ -101,7 +102,23 @@ export const useGameStore = create<GameStoreState>()((set) => ({
 
   applyRoom: (room) => set({ room }),
   setConnection: (connection) => set({ connection }),
-  setError: (error) => set({ lastError: error ? { ...error, at: Date.now() } : null }),
+  /**
+   * Guarda el error para mostrarlo, salvo los que no merecen alarmar.
+   *
+   * `STALE_COMMAND` es el caso concreto: el servidor lo detecta, **lo resuelve
+   * solo** reenviando el estado fresco, y recien despues manda el ack fallido.
+   * Un cartel rojo por algo que el sistema acaba de arreglar deja al jugador
+   * viendo su mesa actualizarse y un error al mismo tiempo.
+   *
+   * El `message` del servidor NO se muestra —expone estado interno del motor—
+   * pero sirve para depurar, asi que va a la consola.
+   */
+  setError: (error) => {
+    if (!error) return set({ lastError: null });
+    if (import.meta.env.DEV) console.warn(`[${error.code}]`, error.message);
+    if (!shouldShowError(error.code)) return;
+    set({ lastError: { ...error, at: Date.now() } });
+  },
 
   reset: () => set({ ...initial }),
 }));

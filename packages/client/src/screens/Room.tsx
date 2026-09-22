@@ -6,6 +6,7 @@ import { useSessionStore } from '../stores/session.js';
 import { useConnection } from '../hooks/useGame.js';
 import { ConnectionBadge } from '../components/ConnectionBadge.js';
 import { PlayerAvatar } from '../components/PlayerAvatar.js';
+import { errorCopy } from '../net/errorCopy.js';
 
 const TARGET_SCORES = [200, 300, 500] as const;
 
@@ -168,7 +169,7 @@ export function Room(): JSX.Element {
 
         {lastError && (
           <p role="alert" className="mb-4 rounded-lg bg-intent-danger/20 px-4 py-2 text-body">
-            {lastError.message}
+            {errorCopy(lastError.code)}
           </p>
         )}
 

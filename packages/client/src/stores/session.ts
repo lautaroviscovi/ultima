@@ -40,7 +40,18 @@ export const useSessionStore = create<SessionState>()(
       sessions: {},
 
       setNickname: (nickname) => {
-        const clean = nickname.trim().slice(0, 20);
+        /**
+         * NO se hace `trim()` aca, y esa es la correccion.
+         *
+         * `Home.tsx` llama a esto en CADA tecla sobre un input controlado, asi
+         * que recortar al guardar borraba el espacio en el momento de
+         * escribirlo: tipear "Juan Pérez" era imposible — la barra espaciadora
+         * despues de "Juan" desaparecia y la segunda palabra nunca empezaba.
+         *
+         * El `trim()` correcto es al ENVIAR, y `Home.tsx` ya lo hace. Aca solo
+         * se acota el largo.
+         */
+        const clean = nickname.slice(0, 20);
         // El nombre SI es una preferencia de persona, no de asiento: sobrevive
         // al cierre de la pestaña y se comparte entre pestañas.
         try {

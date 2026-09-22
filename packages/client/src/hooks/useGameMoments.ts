@@ -44,10 +44,14 @@ export interface RoundScore {
   points: number;
 }
 
+/** Cuanto dura el destello del cambio de sentido, en ms. */
+const REVERSE_FLASH_MS = 900;
+
 export function useGameMoments(): {
   flights: DrawFlight[];
   penalty: number;
   roundScore: RoundScore | null;
+  reverseFlash: boolean;
 } {
   const [flights, setFlights] = useState<DrawFlight[]>([]);
   /** Cuantas cartas te acaban de imponer (+2/+4). 0 = ninguna. */
@@ -62,6 +66,20 @@ export function useGameMoments(): {
    * no un reparto — el resto de la tabla sumó cero.
    */
   const [roundScore, setRoundScore] = useState<RoundScore | null>(null);
+  /**
+   * El destello del cambio de sentido.
+   *
+   * Vive ACA y no en `Table.tsx` comparando `state.direction` contra una ref,
+   * que es como estaba y tenia un bug feo: la rama que detectaba el cambio
+   * salia con un `return` ANTES de actualizar la ref, asi que la ref quedaba
+   * congelada en la direccion vieja para siempre. Y como el efecto dependia de
+   * `state` —un objeto nuevo en cada patch— el destello se disparaba de nuevo
+   * en CADA carta jugada.
+   *
+   * `DIRECTION_REVERSED` es un evento, y un evento pasa UNA vez. Derivar de
+   * eventos en vez de comparar estados elimina la clase entera de bug.
+   */
+  const [reverseFlash, setReverseFlash] = useState(false);
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -94,6 +112,11 @@ export function useGameMoments(): {
       const me = store.state.you.id;
 
       for (const event of fresh) {
+        if (event.type === 'DIRECTION_REVERSED') {
+          setReverseFlash(true);
+          timers.push(setTimeout(() => setReverseFlash(false), REVERSE_FLASH_MS));
+          continue;
+        }
         if (event.type === 'ROUND_ENDED') {
           setRoundScore({ winnerId: event.winnerId, points: event.points });
           continue;
@@ -148,7 +171,7 @@ export function useGameMoments(): {
     };
   }, []);
 
-  return { flights, penalty, roundScore };
+  return { flights, penalty, roundScore, reverseFlash };
 }
 
 export const DRAW_FLIGHT_MS = FLIGHT_MS;

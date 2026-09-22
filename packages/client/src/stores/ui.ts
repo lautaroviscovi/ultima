@@ -21,13 +21,6 @@ export interface UIState {
   cardsInFlight: Set<CardId>;
   handSortMode: HandSortMode;
   soundEnabled: boolean;
-  /**
-   * La voz va aparte del sonido, no atada a el.
-   *
-   * Alguien puede querer los tonos sin la voz: en una videollamada la voz
-   * compite con la gente hablando, mientras que un tono corto no.
-   */
-  voiceEnabled: boolean;
 
   openColorPicker(cardId: CardId): void;
   closeColorPicker(): void;
@@ -35,7 +28,6 @@ export interface UIState {
   unmarkInFlight(cardId: CardId): void;
   setSortMode(mode: HandSortMode): void;
   toggleSound(): void;
-  toggleVoice(): void;
   reset(): void;
 }
 
@@ -45,7 +37,6 @@ const initial = {
   cardsInFlight: new Set<CardId>(),
   handSortMode: 'draw' as HandSortMode,
   soundEnabled: true,
-  voiceEnabled: true,
 };
 
 export const useUIStore = create<UIState>()((set) => ({
@@ -66,7 +57,6 @@ export const useUIStore = create<UIState>()((set) => ({
 
   setSortMode: (handSortMode) => set({ handSortMode }),
   toggleSound: () => set((state) => ({ soundEnabled: !state.soundEnabled })),
-  toggleVoice: () => set((state) => ({ voiceEnabled: !state.voiceEnabled })),
 
   reset: () => set({ ...initial, cardsInFlight: new Set() }),
 }));

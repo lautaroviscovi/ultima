@@ -7,7 +7,8 @@
  * mira la mesa todo el tiempo.
  */
 
-type SoundName = 'turn' | 'play' | 'draw' | 'penalty' | 'uno' | 'win' | 'reverse';
+type SoundName =
+  'turn' | 'play' | 'draw' | 'penalty' | 'skipped' | 'timeout' | 'uno' | 'win' | 'reverse';
 
 interface Tone {
   freq: number;
@@ -42,6 +43,22 @@ const TONES: Record<SoundName, Tone[]> = {
    * dos borraba justo la distincion que importa.
    */
   penalty: [{ freq: 300, duration: 0.18, type: 'sawtooth', gain: 0.13, sweepTo: 140 }],
+
+  /**
+   * Te saltearon. Dos notas que CAEN, como un "uh-oh": pasaste de largo sin
+   * jugar. Distinto del castigo, que es mas grave y arrastrado — no te
+   * impusieron cartas, te perdiste el turno.
+   */
+  skipped: [
+    { freq: 520, duration: 0.09, type: 'triangle', gain: 0.13 },
+    { freq: 390, duration: 0.13, type: 'triangle', gain: 0.12 },
+  ],
+
+  /**
+   * Se te vencio el tiempo. Barrido largo y apagado: algo que se desinfla.
+   * Es el unico que baja tanto, para que no se confunda con nada.
+   */
+  timeout: [{ freq: 420, duration: 0.3, type: 'sine', gain: 0.12, sweepTo: 120 }],
   // Barrido descendente: el reverse suena a "algo se dio vuelta".
   reverse: [{ freq: 700, duration: 0.22, type: 'sawtooth', gain: 0.1, sweepTo: 300 }],
 };

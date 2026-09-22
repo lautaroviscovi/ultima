@@ -1,9 +1,14 @@
 import { useEffect } from 'react';
 import type { GameError } from '../stores/game.js';
+import { errorCopy } from '../net/errorCopy.js';
 
 /**
  * El error de un comando rechazado va SOLO al que lo emitio. Se muestra y se
  * va: no hace falta que el jugador lo cierre a mano en medio de una partida.
+ *
+ * Muestra la traduccion del `code`, NUNCA el `message` del servidor: ese texto
+ * expone estado interno del motor (el nombre de la fase, ids de jugador, la
+ * lista de comandos del protocolo). Ver `net/errorCopy.ts`.
  */
 export function ErrorToast({
   error,
@@ -26,7 +31,7 @@ export function ErrorToast({
       className="absolute left-1/2 top-4 z-50 -translate-x-1/2 rounded-lg bg-intent-danger px-5 py-2
                  text-body font-bold text-white shadow-lg"
     >
-      {error.message}
+      {errorCopy(error.code)}
     </div>
   );
 }

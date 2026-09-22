@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import { isWild, type Card, type Color } from '@uno/engine';
@@ -31,7 +31,6 @@ import { useGameMoments } from '../hooks/useGameMoments.js';
 import { useFitsTable } from '../hooks/useFitsTable.js';
 import { useReducedMotion } from '../hooks/useReducedMotion.js';
 import { unlockAudio } from '../net/sound.js';
-import { primeVoice, stopVoice } from '../net/voice.js';
 import { ColorPicker } from '../components/ColorPicker.js';
 import { ConnectionBadge } from '../components/ConnectionBadge.js';
 import { ErrorToast } from '../components/ErrorToast.js';
@@ -61,11 +60,9 @@ export function Table(): JSX.Element {
   const reducedMotion = useReducedMotion();
   const soundEnabled = useUIStore((s) => s.soundEnabled);
   const toggleSound = useUIStore((s) => s.toggleSound);
-  const voiceEnabled = useUIStore((s) => s.voiceEnabled);
-  const toggleVoice = useUIStore((s) => s.toggleVoice);
   const [sortMode, setSortMode] = useSortMode();
   useGameSounds();
-  const { flights, penalty, roundScore } = useGameMoments();
+  const { flights, penalty, roundScore, reverseFlash } = useGameMoments();
   const fitsTable = useFitsTable();
 
   const colorPickerOpen = useUIStore((s) => s.colorPickerOpen);
@@ -73,9 +70,6 @@ export function Table(): JSX.Element {
   const cardsInFlight = useUIStore((s) => s.cardsInFlight);
   const openColorPicker = useUIStore((s) => s.openColorPicker);
   const closeColorPicker = useUIStore((s) => s.closeColorPicker);
-
-  const [reverseFlash, setReverseFlash] = useState(false);
-  const lastDirection = useRef<1 | -1 | null>(null);
 
   // Sin sesion no hay asiento que reclamar.
   useEffect(() => {
@@ -96,35 +90,10 @@ export function Table(): JSX.Element {
   // Los navegadores bloquean el audio hasta que hay un gesto del usuario: lo
   // desbloqueamos en el primer click para que el tick de turno ya suene.
   useEffect(() => {
-    const unlock = (): void => {
-      unlockAudio();
-      // Resolver la voz tarda hasta un segundo: se hace acá y no en medio de
-      // una jugada.
-      primeVoice();
-    };
+    const unlock = (): void => unlockAudio();
     window.addEventListener('pointerdown', unlock, { once: true });
-    return () => {
-      window.removeEventListener('pointerdown', unlock);
-      // Al salir de la mesa no puede quedar una frase hablando sola.
-      stopVoice();
-    };
+    return () => window.removeEventListener('pointerdown', unlock);
   }, []);
-
-  /**
-   * El reverse es la jugada que mas confunde en UNO online: cuando cambia la
-   * direccion, lo marcamos explicitamente en vez de esperar que lo deduzcan
-   * del orden de los turnos.
-   */
-  useEffect(() => {
-    if (!state) return;
-    if (lastDirection.current !== null && lastDirection.current !== state.direction) {
-      setReverseFlash(true);
-      const id = setTimeout(() => setReverseFlash(false), 900);
-      return () => clearTimeout(id);
-    }
-    lastDirection.current = state.direction;
-    return;
-  }, [state?.direction, state]);
 
   /**
    * Jugar una carta. Un wild necesita color ANTES de mandarse: el comando
@@ -271,18 +240,6 @@ export function Table(): JSX.Element {
             className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
           >
             {soundEnabled ? 'sonido' : 'silencio'}
-          </button>
-          <button
-            onClick={() => {
-              toggleVoice();
-              // Si la estás apagando, callá lo que esté diciendo ahora.
-              if (voiceEnabled) stopVoice();
-            }}
-            aria-pressed={voiceEnabled}
-            title={voiceEnabled ? 'Silenciar la voz' : 'Activar la voz'}
-            className="rounded-full bg-sunken px-3 py-1 text-mini text-white/70 hover:bg-scrim"
-          >
-            voz: {voiceEnabled ? 'sí' : 'no'}
           </button>
           <button
             onClick={handleLeave}
