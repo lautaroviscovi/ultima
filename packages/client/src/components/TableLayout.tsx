@@ -12,7 +12,6 @@ export interface TableLayoutProps {
   opponents: RedactedPlayer[];
   hand: CardModel[];
   playable?: Set<CardId>;
-  selectedId?: CardId | null;
   inFlight?: Set<CardId>;
   currentPlayerId: string | null;
   myId: string;
@@ -37,7 +36,6 @@ export function TableLayout({
   opponents,
   hand,
   playable,
-  selectedId,
   inFlight,
   currentPlayerId,
   myId,
@@ -146,7 +144,6 @@ export function TableLayout({
           <Hand
             cards={hand}
             {...(playable ? { playable } : {})}
-            selectedId={selectedId ?? null}
             {...(inFlight ? { inFlight } : {})}
             {...(onPlay ? { onPlay } : {})}
           />

@@ -41,7 +41,11 @@ export function Home(): JSX.Element {
   return (
     <main className="min-h-screen bg-felt-dark text-white flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        <h1 className="text-5xl font-black tracking-tight text-center mb-1">UNO</h1>
+        {/* La marca lleva tilde: acá es una palabra, no el logotipo del
+            dorso, donde seis letras no entran con el acento. */}
+        <h1 className="mb-1 text-center font-display text-display-xl font-black text-brand-accent">
+          ÚLTIMA
+        </h1>
         <p className="text-center text-white/60 mb-8">hasta 10 jugadores</p>
 
         <label className="block mb-6">

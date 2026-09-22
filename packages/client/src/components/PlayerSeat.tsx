@@ -81,8 +81,8 @@ export function PlayerSeat({
           {player.nickname}
         </span>
         {player.cardCount === 1 && player.hasDeclaredUno && (
-          <span className="rounded bg-uno-yellow px-1 text-[0.6rem] font-black text-black">
-            UNO
+          <span className="rounded bg-brand-accent px-1 font-display text-micro font-black text-brand-ink">
+            ÚLTIMA
           </span>
         )}
       </div>
@@ -132,12 +132,12 @@ export function PlayerSeat({
           type="button"
           onClick={() => onCallOut?.(player.id)}
           className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-0.5
-                     rounded-xl bg-uno-red text-[0.7rem] font-black leading-none animate-pulse"
+                     rounded-xl bg-intent-urgent text-mini font-black leading-none animate-pulse"
         >
           {/* Opaco, no semitransparente: con el nombre translucido detras el
               texto no se lee y el boton no se reconoce como accionable. */}
           <span className="text-[0.6rem] font-normal opacity-90">{player.nickname}</span>
-          <span>¡No dijo UNO!</span>
+          <span>¡No dijo ÚLTIMA!</span>
         </button>
       )}
     </motion.div>

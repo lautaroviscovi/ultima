@@ -71,7 +71,6 @@ export const Estados: Story = {
         [
           ['jugable', { playable: true }],
           ['no jugable', { playable: false }],
-          ['seleccionada', { playable: true, selected: true }],
           ['volando', { playable: true, inFlight: true }],
           ['dorso', { faceDown: true }],
         ] as const

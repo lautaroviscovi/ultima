@@ -1,18 +1,23 @@
 import type { Card as CardModel, CardId } from '@uno/engine';
-import { Card } from './Card.js';
+import { Card, CARD_WIDTH_PX } from './Card.js';
 
 export interface HandProps {
   cards: CardModel[];
   playable?: Set<CardId>;
-  selectedId?: CardId | null;
   inFlight?: Set<CardId>;
   onPlay?: (card: CardModel) => void;
   /** Ancho disponible en px. Solo para tests: en runtime lo da el contenedor. */
   availableWidth?: number;
 }
 
-/** Ancho de una carta `lg` (w-24) en px. */
-export const CARD_WIDTH = 96;
+/**
+ * Ancho de una carta `lg` en px.
+ *
+ * Derivado del mapa de tamaños de Card y no un literal: eran dos declaraciones
+ * del mismo numero, y la de aca era la que se olvidaba de actualizar. El
+ * calculo del abanico depende de que coincida con el ancho REAL renderizado.
+ */
+export const CARD_WIDTH = CARD_WIDTH_PX.lg;
 /** Cuanto debe asomar siempre de cada carta tapada, para poder distinguirla. */
 const MIN_VISIBLE = 26;
 
@@ -42,7 +47,6 @@ export function overlapFor(count: number, availableWidth: number): number {
 export function Hand({
   cards,
   playable,
-  selectedId,
   inFlight,
   onPlay,
   availableWidth,
@@ -64,7 +68,6 @@ export function Hand({
             card={card}
             size="lg"
             playable={playable?.has(card.id) ?? false}
-            selected={selectedId === card.id}
             inFlight={inFlight?.has(card.id) ?? false}
             {...(onPlay ? { onClick: onPlay } : {})}
           />

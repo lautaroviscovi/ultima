@@ -1,5 +1,9 @@
 import { motion } from 'framer-motion';
 import type { Card as CardModel, Color } from '@uno/engine';
+import { SPRING } from '../design/motion.js';
+import { CardBack } from './card/CardBack.js';
+import { CardOval } from './card/CardOval.js';
+import { Draw2Glyph, ReverseGlyph, SkipGlyph, Wild4Glyph, WildGlyph } from './card/glyphs.js';
 
 export type CardSize = 'sm' | 'md' | 'lg';
 
@@ -8,7 +12,6 @@ export interface CardProps {
   /** Dorso: para las manos ajenas y el mazo. Nunca revela la cara. */
   faceDown?: boolean;
   playable?: boolean;
-  selected?: boolean;
   /** Volando hacia el descarte (optimismo visual). */
   inFlight?: boolean;
   size?: CardSize;
@@ -27,11 +30,37 @@ export interface CardProps {
   animateLayout?: boolean;
 }
 
-const SIZE: Record<CardSize, string> = {
-  sm: 'w-10 h-[3.5rem] text-[0.65rem]',
-  md: 'w-16 h-24 text-sm',
-  lg: 'w-24 h-36 text-base',
-};
+/**
+ * Ancho de cada tamaño. TODO lo demas se deriva de aca.
+ *
+ * Los tres tamaños comparten el ratio 5:8 (1.6). Antes `sm` tenia ratio 0.714
+ * y `md`/`lg` 0.667, y ese es el motivo por el que el dorso del asiento se veia
+ * "mas gordo" que la carta de tu mano: no eran la misma carta a otra escala,
+ * eran cartas distintas.
+ */
+export const CARD_WIDTH_PX: Record<CardSize, number> = { sm: 40, md: 60, lg: 90 };
+
+/**
+ * Las proporciones internas salen de `--card-w` por calc.
+ *
+ * Con esto `sm` deja de ser un caso especial lleno de `text-[0.6rem]`, y los
+ * cuadrantes del wild — que tenian `h-3 w-3` fijos y por eso no escalaban — se
+ * arreglan solos.
+ *
+ * En `sm` el glifo central crece (0.6 en vez de 0.52) porque las miniaturas de
+ * esquina se ocultan: siendo la unica informacion de la carta, merece el
+ * espacio que dejan libre.
+ */
+function sizeVars(size: CardSize): Record<string, string> {
+  const w = CARD_WIDTH_PX[size];
+  return {
+    '--card-w': `${w}px`,
+    '--card-h': `${w * 1.6}px`,
+    '--card-radius': `${w * 0.09}px`,
+    '--card-figure': `${w * (size === 'sm' ? 0.6 : 0.52)}px`,
+    '--card-corner': `${w * 0.2}px`,
+  };
+}
 
 const BG: Record<Color, string> = {
   red: 'bg-uno-red',
@@ -40,8 +69,25 @@ const BG: Record<Color, string> = {
   blue: 'bg-uno-blue',
 };
 
-/** El amarillo con blanco encima no pasa contraste: texto negro. */
-const FG: Record<Color, string> = {
+/**
+ * Color del glifo CENTRAL, que se dibuja sobre el ovalo blanco.
+ *
+ * Va en el color de la carta, no en blanco: el ovalo ya es blanco, asi que el
+ * simbolo tiene que contrastar contra EL. Ademas esto hace que el amarillo
+ * deje de ser el caso especial de contraste que era.
+ */
+const INK: Record<Color, string> = {
+  red: 'text-uno-red',
+  yellow: 'text-uno-yellow',
+  green: 'text-uno-green',
+  blue: 'text-uno-blue',
+};
+
+/**
+ * Color de las miniaturas de ESQUINA, que van sobre el color pleno de la
+ * carta y no sobre el ovalo. El amarillo con blanco encima no pasa contraste.
+ */
+const CORNER: Record<Color, string> = {
   red: 'text-white',
   yellow: 'text-black',
   green: 'text-white',
@@ -49,61 +95,60 @@ const FG: Record<Color, string> = {
 };
 
 /**
- * Glifo central. Los simbolos se dibujan, no se escriben con texto.
+ * Glifo central, dibujado sobre el ovalo.
  *
- * Las cifras van en `font-display` (Outfit) y con `tabular-nums`: dentro de un
- * ovalo lo que importa es que el numero se centre en su caja y que un "10" no
- * mida distinto que un "11", porque si no el abanico tiembla al cambiar la
- * mano. Los tamaños `figure-*` ya traen line-height 1 por eso mismo.
+ * Va en el color de la carta y no en blanco: el ovalo ya es blanco, asi que el
+ * simbolo tiene que contrastar CONTRA el, no contra el fondo. Eso tambien hace
+ * que el amarillo deje de ser un caso especial de contraste.
  */
-function Face({ card, size }: { card: CardModel; size: CardSize }): JSX.Element {
-  const big =
-    size === 'lg' ? 'text-figure-lg' : size === 'md' ? 'text-figure-md' : 'text-figure-sm';
-  const figure = `${big} font-display tabular-nums`;
+function Face({ card, corner = false }: { card: CardModel; corner?: boolean }): JSX.Element {
+  const box = corner
+    ? 'h-[var(--card-corner)] w-[var(--card-corner)]'
+    : 'h-[var(--card-figure)] w-[var(--card-figure)]';
+  const text = corner
+    ? 'text-[calc(var(--card-corner)*0.95)]'
+    : 'text-[calc(var(--card-figure)*1.05)]';
+  const figure = `${text} font-display font-black tabular-nums leading-none`;
 
   switch (card.kind) {
     case 'number':
-      return <span className={`${figure} font-black`}>{card.value}</span>;
+      return <span className={figure}>{card.value}</span>;
     case 'skip':
-      return (
-        <span className={`${big} font-black leading-none`} aria-hidden>
-          &#8416;
-        </span>
-      );
+      return <SkipGlyph className={box} />;
     case 'reverse':
-      return (
-        <span className={`${big} font-black leading-none`} aria-hidden>
-          &#8646;
-        </span>
-      );
+      return <ReverseGlyph className={box} />;
     case 'draw2':
-      return <span className={`${figure} font-black`}>+2</span>;
+      // En la esquina no hay lugar para dibujar dos cartas: ahi si va el texto.
+      return corner ? <span className={figure}>+2</span> : <Draw2Glyph className={box} />;
     case 'wild':
-      // Cuatro cuadrantes: es el glifo que todos reconocen del wild.
-      return (
-        <span className="grid grid-cols-2 gap-[2px]" aria-hidden>
-          <i className="block h-3 w-3 rounded-sm bg-uno-red" />
-          <i className="block h-3 w-3 rounded-sm bg-uno-blue" />
-          <i className="block h-3 w-3 rounded-sm bg-uno-yellow" />
-          <i className="block h-3 w-3 rounded-sm bg-uno-green" />
-        </span>
-      );
+      // En la esquina el disco de 12px no se lee: mejor nada que un borron.
+      return corner ? <span /> : <WildGlyph className={box} />;
     case 'wild4':
-      return (
-        <span className="flex flex-col items-center leading-none">
-          <span className="grid grid-cols-2 gap-[2px]" aria-hidden>
-            <i className="block h-2 w-2 rounded-sm bg-uno-red" />
-            <i className="block h-2 w-2 rounded-sm bg-uno-blue" />
-            <i className="block h-2 w-2 rounded-sm bg-uno-yellow" />
-            <i className="block h-2 w-2 rounded-sm bg-uno-green" />
-          </span>
+      /**
+       * El disco va al 72% y el "+4" DEBAJO, no encima.
+       *
+       * A tamaño completo los dos juntos ocupaban el 63% de la altura de la
+       * carta y el numero se montaba sobre los cuadrantes. El +4 es la
+       * informacion mas importante de la carta mas poderosa del mazo: tiene
+       * que leerse solo, no compitiendo con el disco.
+       *
+       * En la esquina va solo el "+4": el disco a 12px es un borron, y el
+       * numero es lo unico que se necesita leer del abanico solapado.
+       */
+      return corner ? (
+        <span className={figure}>+4</span>
+      ) : (
+        <span className="flex flex-col items-center gap-[calc(var(--card-figure)*0.04)] leading-none">
           <span
-            className={`font-display font-black tabular-nums mt-0.5 ${
-              size === 'sm' ? 'text-micro' : 'text-figure-sm'
-            }`}
+            className="block"
+            style={{
+              width: 'calc(var(--card-figure) * 0.72)',
+              height: 'calc(var(--card-figure) * 0.72)',
+            }}
           >
-            +4
+            <Wild4Glyph className="h-full w-full" />
           </span>
+          <span className={figure}>+4</span>
         </span>
       );
   }
@@ -131,26 +176,19 @@ export function Card({
   card,
   faceDown = false,
   playable = false,
-  selected = false,
   inFlight = false,
   size = 'md',
   onClick,
   animateLayout = true,
 }: CardProps): JSX.Element {
+  const vars = sizeVars(size);
+  const box = 'w-[var(--card-w)] h-[var(--card-h)]';
+
   if (faceDown) {
-    return (
-      <div
-        className={`${SIZE[size]} shrink-0 rounded-lg border-2 border-white/80 bg-overlay
-                    shadow-card flex items-center justify-center`}
-        aria-hidden
-      >
-        <span className="rotate-[-20deg] font-black italic text-uno-yellow text-[0.7em]">UNO</span>
-      </div>
-    );
+    return <CardBack className={`${box} shrink-0`} style={vars} />;
   }
 
   const colored = 'color' in card;
-  const base = colored ? `${BG[card.color]} ${FG[card.color]}` : 'bg-overlay text-white';
   const interactive = Boolean(onClick);
 
   return (
@@ -158,43 +196,55 @@ export function Card({
       {...(animateLayout ? { layoutId: card.id } : {})}
       layout={animateLayout}
       type="button"
+      style={vars}
       disabled={!interactive || !playable}
       onClick={() => onClick?.(card)}
       aria-label={cardAria(card)}
-      aria-pressed={selected}
-      // La carta jugable se eleva al pasar el mouse; la elevacion del
-      // seleccionado va por `animate` para que no pelee con el layout.
-      {...(playable ? { whileHover: { y: -10 }, whileTap: { scale: 0.96 } } : {})}
-      animate={{ y: selected ? -12 : 0, opacity: inFlight ? 0 : 1 }}
-      transition={{ type: 'spring', stiffness: 520, damping: 34 }}
-      className={`${SIZE[size]} ${base} shrink-0 rounded-lg border-2 border-white
-                  shadow-card relative flex items-center justify-center
-                  ${playable ? 'cursor-pointer' : ''}
-                  ${!playable && interactive ? 'opacity-45 saturate-50 cursor-not-allowed' : ''}
-                  ${selected ? 'ring-4 ring-white' : ''}`}
+      {...(playable ? { whileHover: { y: -14 }, whileTap: { scale: 0.96 } } : {})}
+      /**
+       * La jugable se ELEVA en reposo, no solo al hover.
+       *
+       * Antes la no jugable se apagaba con `opacity-45 saturate-50`, y con 15
+       * cartas en mano eso deja tu mano mayormente muerta — justo cuando mas
+       * necesitas planear con las cartas que TODAVIA no podes jugar.
+       *
+       * Invertido: la no jugable sigue legible y la jugable se despega. Con el
+       * abanico solapado la diferencia de ALTURA es la señal mas fuerte que
+       * hay, porque se lee sin hover y todas juntas de un vistazo.
+       */
+      animate={{ y: playable ? -6 : 0, opacity: inFlight ? 0 : 1 }}
+      transition={SPRING.snap}
+      className={`${box} shrink-0 relative flex items-center justify-center overflow-hidden
+                  rounded-[var(--card-radius)] border-2 border-white shadow-card
+                  ${colored ? BG[card.color] : 'bg-overlay'}
+                  ${playable ? 'cursor-pointer shadow-card-lift ring-2 ring-brand-accent/40' : ''}
+                  ${!playable && interactive ? 'opacity-[0.78] saturate-[0.85] cursor-not-allowed' : ''}`}
     >
-      {/* Elipse blanca de fondo, el rasgo visual que define a la carta.
-          Sigue siendo un div rotado semitransparente: la fase 3 lo reemplaza
-          por un SVG, que es lo que arregla el escalado y el color sucio. */}
-      {colored && (
-        <span
-          className="absolute inset-[12%] rounded-[50%] bg-white/25 rotate-[-30deg]"
-          aria-hidden
-        />
-      )}
-      <span className="relative flex items-center justify-center">
-        <Face card={card} size={size} />
+      {colored && <CardOval className="absolute inset-0 h-full w-full" />}
+
+      <span
+        className={`relative flex items-center justify-center ${
+          colored ? INK[card.color] : 'text-white'
+        }`}
+      >
+        <Face card={card} />
       </span>
+
       {size !== 'sm' && (
         <>
-          <span className="absolute top-1 left-1.5 text-[0.6em] font-bold leading-none" aria-hidden>
-            <Face card={card} size="sm" />
-          </span>
           <span
-            className="absolute bottom-1 right-1.5 rotate-180 text-[0.6em] font-bold leading-none"
+            className={`absolute left-[6%] top-[3%] ${colored ? CORNER[card.color] : 'text-white'}`}
             aria-hidden
           >
-            <Face card={card} size="sm" />
+            <Face card={card} corner />
+          </span>
+          <span
+            className={`absolute bottom-[3%] right-[6%] rotate-180 ${
+              colored ? CORNER[card.color] : 'text-white'
+            }`}
+            aria-hidden
+          >
+            <Face card={card} corner />
           </span>
         </>
       )}

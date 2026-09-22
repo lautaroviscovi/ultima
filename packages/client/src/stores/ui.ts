@@ -10,7 +10,6 @@ export type HandSortMode = 'draw' | 'color' | 'value';
  * no debe re-renderizar porque abriste el color picker.
  */
 export interface UIState {
-  selectedCardId: CardId | null;
   /** Carta wild esperando que elijas color antes de mandarla. */
   pendingWildCardId: CardId | null;
   colorPickerOpen: boolean;
@@ -23,7 +22,6 @@ export interface UIState {
   handSortMode: HandSortMode;
   soundEnabled: boolean;
 
-  select(cardId: CardId | null): void;
   openColorPicker(cardId: CardId): void;
   closeColorPicker(): void;
   markInFlight(cardId: CardId): void;
@@ -34,7 +32,6 @@ export interface UIState {
 }
 
 const initial = {
-  selectedCardId: null,
   pendingWildCardId: null,
   colorPickerOpen: false,
   cardsInFlight: new Set<CardId>(),
@@ -44,8 +41,6 @@ const initial = {
 
 export const useUIStore = create<UIState>()((set) => ({
   ...initial,
-
-  select: (selectedCardId) => set({ selectedCardId }),
 
   openColorPicker: (cardId) => set({ colorPickerOpen: true, pendingWildCardId: cardId }),
   closeColorPicker: () => set({ colorPickerOpen: false, pendingWildCardId: null }),

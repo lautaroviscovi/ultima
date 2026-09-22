@@ -28,6 +28,14 @@ const GLOW: Record<Color, string> = {
 };
 
 /**
+ * El mazo se dibuja con `Card faceDown`, que no mira la carta — un dorso que
+ * dependiera de su contenido filtraria informacion. Esta constante existe solo
+ * para satisfacer el tipo, y es deliberadamente una carta imposible de jugar
+ * para que se note si alguna vez se renderizara de frente por error.
+ */
+const PLACEHOLDER: CardModel = { id: 'deck-back', kind: 'wild' };
+
+/**
  * El halo de color comunica el color ACTIVO, que puede diferir de la carta del
  * tope cuando se jugo un wild. Sin esto, un wild deja la mesa sin indicar a que
  * se puede jugar.
@@ -59,24 +67,20 @@ export function DiscardPile({
         className={`relative ${canDraw ? 'hover:-translate-y-1 cursor-pointer' : 'cursor-default'}
                     transition-transform`}
       >
-        <div
-          className="h-24 w-16 rounded-lg border-2 border-white/80 bg-overlay shadow-card
-                        flex items-center justify-center"
-        >
-          <span className="rotate-[-20deg] font-display font-black italic text-brand-accent text-mini">
-            ÚLTIMA
-          </span>
-        </div>
+        {/* El dorso estaba duplicado acá con markup propio, distinto al de
+            Card. Ahora es el MISMO componente, así que el mazo y las manos
+            ajenas no pueden volver a divergir. */}
+        <Card card={PLACEHOLDER} faceDown size="md" />
         <span className="absolute -bottom-5 left-0 right-0 text-center text-micro text-white/60">
           {drawPileCount}
         </span>
       </button>
 
-      <div className="relative h-24 w-16">
+      <div className="relative h-[96px] w-[60px]">
         {top ? (
           <Card card={top} size="md" />
         ) : (
-          <div className="h-24 w-16 rounded-lg border-2 border-dashed border-white/30" />
+          <div className="h-full w-full rounded-lg border-2 border-dashed border-white/30" />
         )}
       </div>
     </div>

@@ -11,3 +11,6 @@ coverage/
 .vite/
 .vercel
 .env*
+
+# Estado local de `wrangler dev`. No es del proyecto.
+.wrangler/
