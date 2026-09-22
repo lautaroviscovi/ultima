@@ -51,7 +51,7 @@ export function Home(): JSX.Element {
             onChange={(e) => setNickname(e.target.value)}
             maxLength={20}
             placeholder="Lautaro"
-            className="mt-1 w-full rounded-lg bg-white/10 px-4 py-3 text-lg outline-none
+            className="mt-1 w-full rounded-lg bg-raised px-4 py-3 text-lg outline-none
                        ring-1 ring-white/20 focus:ring-2 focus:ring-uno-yellow"
           />
         </label>
@@ -68,9 +68,9 @@ export function Home(): JSX.Element {
         </form>
 
         <div className="flex items-center gap-3 mb-6 text-white/40 text-sm">
-          <div className="h-px flex-1 bg-white/20" />
+          <div className="h-px flex-1 bg-active" />
           o unite a una
-          <div className="h-px flex-1 bg-white/20" />
+          <div className="h-px flex-1 bg-active" />
         </div>
 
         <form onSubmit={handleJoin} className="flex gap-2">
@@ -79,7 +79,7 @@ export function Home(): JSX.Element {
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             maxLength={6}
             placeholder="CÓDIGO"
-            className="flex-1 rounded-lg bg-white/10 px-4 py-3 text-lg font-mono tracking-[0.3em]
+            className="flex-1 rounded-lg bg-raised px-4 py-3 text-lg font-mono tracking-[0.3em]
                        uppercase outline-none ring-1 ring-white/20 focus:ring-2 focus:ring-uno-yellow"
           />
           <button
@@ -105,7 +105,7 @@ export function Home(): JSX.Element {
               <button
                 key={roomId}
                 onClick={() => navigate(`/room/${roomId}`)}
-                className="mr-2 rounded-lg bg-white/10 px-4 py-2 font-mono hover:bg-white/20"
+                className="mr-2 rounded-lg bg-raised px-4 py-2 font-mono hover:bg-active"
               >
                 {roomId}
               </button>

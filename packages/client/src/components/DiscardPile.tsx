@@ -1,4 +1,6 @@
+import type { CSSProperties } from 'react';
 import type { Card as CardModel, Color } from '@uno/engine';
+import { DURATION } from '../design/motion.js';
 import { Card } from './Card.js';
 
 export interface DiscardPileProps {
@@ -9,11 +11,20 @@ export interface DiscardPileProps {
   onDraw?: () => void;
 }
 
-const RING: Record<Color, string> = {
-  red: 'shadow-[0_0_60px_18px_rgba(215,38,0,0.55)]',
-  yellow: 'shadow-[0_0_60px_18px_rgba(232,176,0,0.55)]',
-  green: 'shadow-[0_0_60px_18px_rgba(0,166,81,0.55)]',
-  blue: 'shadow-[0_0_60px_18px_rgba(0,130,206,0.55)]',
+/**
+ * El halo es UNA sombra parametrizada por color, no cuatro sombras.
+ *
+ * Antes eran cuatro `shadow-[0_0_60px_18px_rgba(215,38,0,0.55)]` con los
+ * canales de cada pigmento reescritos a mano — o sea, el mismo color
+ * declarado en dos lugares, y el literal era el que se olvidaba de
+ * actualizar. Ahora el color sale del token y lo unico que cambia es a cual
+ * apunta `--glow-color`.
+ */
+const GLOW: Record<Color, string> = {
+  red: 'var(--uno-red)',
+  yellow: 'var(--uno-yellow)',
+  green: 'var(--uno-green)',
+  blue: 'var(--uno-blue)',
 };
 
 /**
@@ -29,7 +40,17 @@ export function DiscardPile({
   onDraw,
 }: DiscardPileProps): JSX.Element {
   return (
-    <div className={`flex items-center gap-5 rounded-2xl p-4 ${RING[activeColor]}`}>
+    <div
+      className="flex items-center gap-5 rounded-2xl p-4 shadow-halo transition-[box-shadow]"
+      // El color activo cambia al jugarse un wild: transicionado, no de golpe,
+      // porque es informacion nueva sobre a que se puede jugar.
+      style={
+        {
+          '--glow-color': GLOW[activeColor],
+          transitionDuration: `${DURATION.color}s`,
+        } as CSSProperties
+      }
+    >
       <button
         type="button"
         onClick={onDraw}
@@ -39,12 +60,14 @@ export function DiscardPile({
                     transition-transform`}
       >
         <div
-          className="h-24 w-16 rounded-lg border-2 border-white/80 bg-neutral-900 shadow-md
+          className="h-24 w-16 rounded-lg border-2 border-white/80 bg-overlay shadow-card
                         flex items-center justify-center"
         >
-          <span className="rotate-[-20deg] font-black italic text-uno-yellow text-xs">UNO</span>
+          <span className="rotate-[-20deg] font-display font-black italic text-brand-accent text-mini">
+            ÚLTIMA
+          </span>
         </div>
-        <span className="absolute -bottom-5 left-0 right-0 text-center text-[0.65rem] text-white/60">
+        <span className="absolute -bottom-5 left-0 right-0 text-center text-micro text-white/60">
           {drawPileCount}
         </span>
       </button>

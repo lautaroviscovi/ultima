@@ -13,6 +13,33 @@
 /** @param {string} v */
 const channel = (v) => `rgb(var(${v}) / <alpha-value>)`;
 
+/**
+ * Sombras paramétricas por color.
+ *
+ * La geometría se escribe ACÁ y no como token en `:root`, y la razón es sutil
+ * pero costó un bug silencioso: una custom property que contiene `var()` se
+ * sustituye donde está DECLARADA. Un `--shadow-halo: ... rgb(var(--glow-color)
+ * / .55)` declarado en `:root` congela ahí el color, y el componente que
+ * después redefine `--glow-color` no cambia nada — el halo del descarte salía
+ * amarillo con cualquier color activo.
+ *
+ * Verificado en el navegador: `--glow-color` computaba `215 38 0` en el propio
+ * nodo y la sombra seguía saliendo `rgba(250,204,21)`.
+ *
+ * Escrita así, la `var()` recién se resuelve en el elemento, que es donde el
+ * componente ya definió su color. Tampoco pueden pasar por `theme.boxShadow`,
+ * que las compilaría a `--tw-shadow` y reintroduciría el mismo problema.
+ */
+const GLOW = 'rgb(var(--glow-color) / <alpha>)';
+const glowUtilities = {
+  '.shadow-glow': { boxShadow: `0 0 24px ${GLOW.replace('<alpha>', '0.55')}` },
+  // Mucho más grande que shadow-glow: tiene que leerse desde el otro extremo
+  // de una mesa de 10, no marcar un elemento.
+  '.shadow-halo': { boxShadow: `0 0 60px 18px ${GLOW.replace('<alpha>', '0.55')}` },
+  // Hacia ADENTRO: marca una zona (la barra de mano cuando te toca), no un objeto.
+  '.shadow-glow-inset': { boxShadow: `inset 0 0 40px ${GLOW.replace('<alpha>', '0.35')}` },
+};
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -60,13 +87,15 @@ export default {
         strong: 'var(--border-strong)',
       },
 
+      /**
+       * Sombras de valor FIJO. Las paramétricas por color NO van acá — ver
+       * el plugin de abajo.
+       */
       boxShadow: {
         card: 'var(--shadow-card)',
         'card-lift': 'var(--shadow-card-lift)',
         seat: 'var(--shadow-seat)',
         modal: 'var(--shadow-modal)',
-        // Paramétrico: el componente setea --glow-color inline.
-        glow: 'var(--shadow-glow)',
       },
 
       fontFamily: {
@@ -99,5 +128,9 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    ({ addUtilities }) => {
+      addUtilities(glowUtilities);
+    },
+  ],
 };

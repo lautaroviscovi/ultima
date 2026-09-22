@@ -110,16 +110,16 @@ export function TableLayout({
         */}
         <div
           className={`relative border-t-2 transition-colors duration-300
-                      ${isMyTurn ? 'border-uno-yellow bg-black/40' : 'border-white/10 bg-black/25'}`}
+                      ${isMyTurn ? 'border-brand-accent bg-scrim' : 'border-subtle bg-sunken'}`}
         >
           {/* Cuando te toca cambia el marco entero: con gente en videollamada la
               atencion esta partida y no se puede asumir que miren la mesa. */}
-          {isMyTurn && (
-            <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_40px_rgba(232,176,0,0.35)]" />
-          )}
+          {isMyTurn && <div className="pointer-events-none absolute inset-0 shadow-glow-inset" />}
 
           <div className="flex items-center justify-between px-6 pt-2">
-            <span className={`text-sm font-bold ${isMyTurn ? 'text-uno-yellow' : 'text-white/50'}`}>
+            <span
+              className={`text-body font-bold ${isMyTurn ? 'text-brand-accent' : 'text-white/50'}`}
+            >
               {isMyTurn ? 'Te toca' : 'Tu mano'}
               <span className="ml-2 font-normal text-white/50">
                 {hand.length} {hand.length === 1 ? 'carta' : 'cartas'}
@@ -132,14 +132,14 @@ export function TableLayout({
               type="button"
               onClick={onDeclareUno}
               disabled={!aboutToWin}
-              className={`rounded-full px-5 py-1.5 text-sm font-black transition-all
+              className={`rounded-full px-5 py-1.5 font-display text-body font-black transition-all
                           ${
                             aboutToWin
-                              ? 'bg-uno-yellow text-black animate-pulse'
-                              : 'bg-white/10 text-white/30'
+                              ? 'bg-brand-accent text-brand-ink animate-pulse'
+                              : 'bg-raised text-white/30'
                           }`}
             >
-              ¡UNO!
+              ¡ÚLTIMA!
             </button>
           </div>
 

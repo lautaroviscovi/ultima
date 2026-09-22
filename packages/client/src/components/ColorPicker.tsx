@@ -27,9 +27,9 @@ export function ColorPicker({ open, onPick, onCancel }: ColorPickerProps): JSX.E
     <div
       role="dialog"
       aria-label="Elegí el color"
-      className="absolute inset-0 z-30 flex items-center justify-center bg-black/60"
+      className="absolute inset-0 z-30 flex items-center justify-center bg-scrim"
     >
-      <div className="rounded-2xl bg-neutral-900 p-6 shadow-2xl">
+      <div className="rounded-2xl bg-overlay p-6 shadow-modal">
         <p className="mb-4 text-center font-bold text-white">Elegí el color</p>
         <div className="grid grid-cols-2 gap-3">
           {COLORS.map((color) => (

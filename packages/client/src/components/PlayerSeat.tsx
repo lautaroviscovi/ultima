@@ -52,7 +52,7 @@ export function PlayerSeat({
       }}
       transition={{ type: 'spring', stiffness: 400, damping: 28 }}
       className={`relative flex w-[7.5rem] flex-col items-center rounded-xl px-2 py-1.5
-                  ${isCurrent ? 'bg-white/15 shadow-lg shadow-black/40' : 'bg-black/25'}`}
+                  ${isCurrent ? 'bg-raised-hover shadow-lg shadow-black/40' : 'bg-sunken'}`}
     >
       {/* Anillo de progreso: turno y urgencia en un solo elemento. */}
       {isCurrent && (
@@ -98,7 +98,7 @@ export function PlayerSeat({
               animate={{ scaleY: 1, opacity: 1 }}
               exit={{ scaleY: 0.4, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-              className="block h-5 w-2.5 shrink-0 rounded-[2px] border border-white/70 bg-neutral-900"
+              className="block h-5 w-2.5 shrink-0 rounded-[2px] border border-white/70 bg-overlay"
               style={{ marginLeft: i === 0 ? 0 : '-3px' }}
             />
           ))}

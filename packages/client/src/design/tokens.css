@@ -90,7 +90,20 @@
   --shadow-card-lift: 0 4px 8px rgb(0 0 0 / 0.32), 0 12px 28px rgb(0 0 0 / 0.38);
   --shadow-seat: 0 2px 8px rgb(0 0 0 / 0.35);
   --shadow-modal: 0 24px 64px rgb(0 0 0 / 0.55);
-  --shadow-glow: 0 0 24px rgb(var(--glow-color) / 0.55);
+
+  /**
+   * OJO: las sombras que dependen de --glow-color NO se declaran acá.
+   *
+   * Una custom property que usa `var()` se sustituye donde está DECLARADA, no
+   * donde se usa. Si `--shadow-halo` viviera en `:root`, su `var(--glow-color)`
+   * quedaría resuelto con el valor de `:root` (el amarillo de marca) y
+   * redefinir `--glow-color` en el componente no cambiaría nada.
+   *
+   * Eso fue un bug real y silencioso: el halo del descarte salía amarillo con
+   * cualquier color activo, aunque `--glow-color` computara rojo en ese mismo
+   * nodo. Por eso las tres utilidades de glow componen el `box-shadow` en el
+   * propio elemento (ver tailwind.config.js).
+   */
 
   /* ---------------------------------------------------------------------
    * LA CARTA — una sola variable de la que sale todo lo demás.

@@ -23,8 +23,8 @@ export function RoundOverlay({
   const ranked = [...state.players].sort((a, b) => b.score - a.score);
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/75 p-6">
-      <div className="w-full max-w-md rounded-2xl bg-neutral-900 p-6 shadow-2xl">
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-scrim p-6">
+      <div className="w-full max-w-md rounded-2xl bg-overlay p-6 shadow-modal">
         <p className="text-center text-sm uppercase tracking-widest text-white/50">
           {isGameOver ? 'Fin de la partida' : `Fin de la ronda ${state.round + 1}`}
         </p>
@@ -37,7 +37,7 @@ export function RoundOverlay({
             <li
               key={player.id}
               className={`flex items-center gap-3 rounded-lg px-3 py-2 ${
-                player.id === state.you.id ? 'bg-white/15' : 'bg-white/5'
+                player.id === state.you.id ? 'bg-raised-hover' : 'bg-raised'
               }`}
             >
               <span className="w-5 text-center text-sm text-white/40">{i + 1}</span>
@@ -55,7 +55,7 @@ export function RoundOverlay({
           {isGameOver ? (
             <button
               onClick={onLeave}
-              className="flex-1 rounded-lg bg-white/10 py-3 font-bold text-white hover:bg-white/20"
+              className="flex-1 rounded-lg bg-raised py-3 font-bold text-white hover:bg-active"
             >
               Volver al inicio
             </button>
@@ -68,7 +68,7 @@ export function RoundOverlay({
               Siguiente ronda
             </button>
           ) : (
-            <p className="flex-1 rounded-lg bg-white/5 py-3 text-center text-white/60">
+            <p className="flex-1 rounded-lg bg-raised py-3 text-center text-white/60">
               Esperando al anfitrión…
             </p>
           )}

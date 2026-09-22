@@ -213,7 +213,7 @@ export function Table(): JSX.Element {
       <main className="relative min-h-screen bg-felt-dark">
         <div className="absolute left-3 top-3 z-20 flex items-center gap-2">
           <ConnectionBadge status={connection} />
-          <span className="rounded-full bg-black/30 px-3 py-1 font-mono text-xs text-white/60">
+          <span className="rounded-full bg-sunken px-3 py-1 font-mono text-xs text-white/60">
             {roomId}
           </span>
           {isMyTurn && timer.secondsLeft <= 15 && (
@@ -232,7 +232,7 @@ export function Table(): JSX.Element {
             onClick={() =>
               setSortMode(sortMode === 'draw' ? 'color' : sortMode === 'color' ? 'value' : 'draw')
             }
-            className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
+            className="rounded-full bg-sunken px-3 py-1 text-xs text-white/70 hover:bg-scrim"
           >
             orden: {sortMode === 'draw' ? 'robo' : sortMode === 'color' ? 'color' : 'valor'}
           </button>
@@ -240,13 +240,13 @@ export function Table(): JSX.Element {
             onClick={toggleSound}
             aria-pressed={soundEnabled}
             title={soundEnabled ? 'Silenciar' : 'Activar sonido'}
-            className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
+            className="rounded-full bg-sunken px-3 py-1 text-xs text-white/70 hover:bg-scrim"
           >
             {soundEnabled ? 'sonido' : 'silencio'}
           </button>
           <button
             onClick={handleLeave}
-            className="rounded-full bg-black/30 px-3 py-1 text-xs text-white/70 hover:bg-black/50"
+            className="rounded-full bg-sunken px-3 py-1 text-xs text-white/70 hover:bg-scrim"
           >
             salir
           </button>

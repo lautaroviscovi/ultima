@@ -140,8 +140,8 @@ export function Card({
   if (faceDown) {
     return (
       <div
-        className={`${SIZE[size]} shrink-0 rounded-lg border-2 border-white/80 bg-neutral-900
-                    shadow-md flex items-center justify-center`}
+        className={`${SIZE[size]} shrink-0 rounded-lg border-2 border-white/80 bg-overlay
+                    shadow-card flex items-center justify-center`}
         aria-hidden
       >
         <span className="rotate-[-20deg] font-black italic text-uno-yellow text-[0.7em]">UNO</span>
@@ -150,7 +150,7 @@ export function Card({
   }
 
   const colored = 'color' in card;
-  const base = colored ? `${BG[card.color]} ${FG[card.color]}` : 'bg-neutral-900 text-white';
+  const base = colored ? `${BG[card.color]} ${FG[card.color]}` : 'bg-overlay text-white';
   const interactive = Boolean(onClick);
 
   return (
@@ -168,12 +168,14 @@ export function Card({
       animate={{ y: selected ? -12 : 0, opacity: inFlight ? 0 : 1 }}
       transition={{ type: 'spring', stiffness: 520, damping: 34 }}
       className={`${SIZE[size]} ${base} shrink-0 rounded-lg border-2 border-white
-                  shadow-md relative flex items-center justify-center
+                  shadow-card relative flex items-center justify-center
                   ${playable ? 'cursor-pointer' : ''}
                   ${!playable && interactive ? 'opacity-45 saturate-50 cursor-not-allowed' : ''}
                   ${selected ? 'ring-4 ring-white' : ''}`}
     >
-      {/* Elipse blanca de fondo, el rasgo visual que define a la carta de UNO. */}
+      {/* Elipse blanca de fondo, el rasgo visual que define a la carta.
+          Sigue siendo un div rotado semitransparente: la fase 3 lo reemplaza
+          por un SVG, que es lo que arregla el escalado y el color sucio. */}
       {colored && (
         <span
           className="absolute inset-[12%] rounded-[50%] bg-white/25 rotate-[-30deg]"
