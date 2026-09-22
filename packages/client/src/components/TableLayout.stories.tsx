@@ -141,9 +141,35 @@ export const EstadosDeJugador: Story = {
   })(),
 };
 
-/** Sentido antihorario tras un reverse, con el flash del cambio. */
+/** Sentido antihorario tras un reverse, con el anuncio del cambio. */
 export const SentidoInvertido: Story = {
-  args: { ...propsFor(10, { direction: -1 }), reverseFlash: true },
+  args: {
+    ...propsFor(10, { direction: -1 }),
+    announcement: { kind: 'reverse' as const, direction: -1 as const },
+  },
+};
+
+/**
+ * Los otros anuncios.
+ *
+ * Existen como stories separadas porque en el juego NUNCA se ven dos a la vez:
+ * el hook elige uno por prioridad. Aca se pueden mirar de a uno.
+ */
+export const AnuncioMasCuatro: Story = {
+  args: { ...propsFor(10), announcement: { kind: 'draw4' as const } },
+};
+
+export const AnuncioMasDos: Story = {
+  args: { ...propsFor(10), announcement: { kind: 'draw2' as const } },
+};
+
+export const AnuncioTeSaltearon: Story = {
+  args: { ...propsFor(10), announcement: { kind: 'skipped' as const } },
+};
+
+/** El ÚLTIMA ajeno: el único anuncio que NO es sobre vos. */
+export const AnuncioUltima: Story = {
+  args: { ...propsFor(10), announcement: { kind: 'uno' as const, who: 'Jugador 4' } },
 };
 
 /**
@@ -156,6 +182,9 @@ export const SentidoInvertido: Story = {
  * alguien mueva el toolbar.
  */
 export const MovimientoReducido: Story = {
-  args: { ...propsFor(10), reverseFlash: true },
+  args: {
+    ...propsFor(10),
+    announcement: { kind: 'reverse' as const, direction: 1 as const },
+  },
   globals: { motion: 'reduced' },
 };

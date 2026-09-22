@@ -104,6 +104,22 @@ export default {
         modal: 'var(--shadow-modal)',
       },
 
+      /**
+       * La escala de apilado, documentada.
+       *
+       * Antes los valores estaban sueltos en los componentes y varios
+       * EMPATABAN en `z-30`: el flash de reverse, el de castigo y el
+       * ColorPicker. Con empate, el orden lo decide la posicion en el DOM —
+       * o sea, por accidente.
+       */
+      zIndex: {
+        table: '10',
+        hud: '20',
+        announcement: '30',
+        modal: '40',
+        toast: '50',
+      },
+
       fontFamily: {
         sans: ['Inter Variable', 'Inter Fallback', 'system-ui', 'sans-serif'],
         // Cifras de carta y títulos. Contadores abiertos y `1` con bandera.

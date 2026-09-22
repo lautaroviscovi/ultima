@@ -63,7 +63,7 @@ export function Table(): JSX.Element {
   const toggleSound = useUIStore((s) => s.toggleSound);
   const [sortMode, setSortMode] = useSortMode();
   useGameSounds();
-  const { flights, penalty, roundScore, reverseFlash } = useGameMoments();
+  const { flights, penalty, roundScore, announcement } = useGameMoments();
   const fitsTable = useFitsTable();
 
   const colorPickerOpen = useUIStore((s) => s.colorPickerOpen);
@@ -289,7 +289,7 @@ export function Table(): JSX.Element {
           isMyTurn={isMyTurn}
           unoWindowFor={unoWindowFor}
           unoArmed={unoArmed}
-          reverseFlash={reverseFlash}
+          announcement={announcement}
           onPlay={handlePlay}
           onDraw={handleDraw}
           onCallOut={handleCallOut}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Card } from '@uno/engine';
 import { useGameStore } from '../stores/game.js';
+import { ANNOUNCEMENT_PRIORITY, type Announcement } from '../components/Announcement.js';
 
 /** Cuanto dura el vuelo mazo -> mano, en ms. */
 const FLIGHT_MS = 420;
@@ -44,14 +45,14 @@ export interface RoundScore {
   points: number;
 }
 
-/** Cuanto dura el destello del cambio de sentido, en ms. */
-const REVERSE_FLASH_MS = 900;
+/** Cuanto dura un anuncio a pantalla completa, en ms. */
+const ANNOUNCEMENT_MS = 1100;
 
 export function useGameMoments(): {
   flights: DrawFlight[];
   penalty: number;
   roundScore: RoundScore | null;
-  reverseFlash: boolean;
+  announcement: Announcement | null;
 } {
   const [flights, setFlights] = useState<DrawFlight[]>([]);
   /** Cuantas cartas te acaban de imponer (+2/+4). 0 = ninguna. */
@@ -67,19 +68,19 @@ export function useGameMoments(): {
    */
   const [roundScore, setRoundScore] = useState<RoundScore | null>(null);
   /**
-   * El destello del cambio de sentido.
+   * El anuncio a pantalla completa, UNO por vez.
    *
-   * Vive ACA y no en `Table.tsx` comparando `state.direction` contra una ref,
-   * que es como estaba y tenia un bug feo: la rama que detectaba el cambio
-   * salia con un `return` ANTES de actualizar la ref, asi que la ref quedaba
-   * congelada en la direccion vieja para siempre. Y como el efecto dependia de
-   * `state` —un objeto nuevo en cada patch— el destello se disparaba de nuevo
-   * en CADA carta jugada.
+   * Vive aca y no en `Table.tsx` comparando estados: `DIRECTION_REVERSED` es
+   * un evento, y un evento pasa UNA vez. La version anterior comparaba
+   * `state.direction` contra una ref y el destello se repetia en cada carta
+   * jugada — derivar de eventos elimina esa clase entera de bug.
    *
-   * `DIRECTION_REVERSED` es un evento, y un evento pasa UNA vez. Derivar de
-   * eventos en vez de comparar estados elimina la clase entera de bug.
+   * Es un solo estado y no cuatro booleanos porque estos eventos LLEGAN
+   * JUNTOS: cada +2/+4 trae `CARDS_DRAWN` y `PLAYER_SKIPPED` en el mismo
+   * batch. Cuatro estados independientes serian cuatro carteles centrados uno
+   * encima del otro.
    */
-  const [reverseFlash, setReverseFlash] = useState(false);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -111,10 +112,38 @@ export function useGameMoments(): {
       const fresh = store.events.slice(Math.max(0, store.events.length - pending));
       const me = store.state.you.id;
 
+      /**
+       * El anuncio del batch: se junta todo y gana el de mayor prioridad.
+       *
+       * Un +4 trae `CARDS_DRAWN(4)` y `PLAYER_SKIPPED` juntos; anunciarlo como
+       * "+4" dice las dos cosas, y mostrar ademas "te saltearon" seria ruido
+       * encima del mismo hecho.
+       */
+      let best: Announcement | null = null;
+      const offer = (candidate: Announcement): void => {
+        if (!best || ANNOUNCEMENT_PRIORITY[candidate.kind] > ANNOUNCEMENT_PRIORITY[best.kind]) {
+          best = candidate;
+        }
+      };
+
       for (const event of fresh) {
         if (event.type === 'DIRECTION_REVERSED') {
-          setReverseFlash(true);
-          timers.push(setTimeout(() => setReverseFlash(false), REVERSE_FLASH_MS));
+          offer({ kind: 'reverse', direction: event.direction });
+          continue;
+        }
+        /**
+         * El ÚLTIMA ajeno SI se anuncia, a diferencia del resto.
+         *
+         * Es informacion de mesa: si no ves que canto, no sabes que ya no lo
+         * podes acusar. Los demas anuncios son cosas que te pasan A VOS.
+         */
+        if (event.type === 'UNO_DECLARED') {
+          const who = store.state.players.find((p) => p.id === event.playerId);
+          offer({ kind: 'uno', ...(who ? { who: who.nickname } : {}) });
+          continue;
+        }
+        if (event.type === 'PLAYER_SKIPPED') {
+          if (event.playerId === me) offer({ kind: 'skipped' });
           continue;
         }
         if (event.type === 'ROUND_ENDED') {
@@ -139,6 +168,8 @@ export function useGameMoments(): {
         if (cards.length > 1) {
           setPenalty(cards.length);
           timers.push(setTimeout(() => setPenalty(0), FLIGHT_MS + cards.length * STAGGER_MS + 500));
+          // El +4 le gana al salteo que viene en el mismo batch.
+          offer({ kind: cards.length >= 4 ? 'draw4' : 'draw2' });
         }
 
         const stamp = Date.now();
@@ -163,6 +194,18 @@ export function useGameMoments(): {
           );
         }
       }
+
+      /**
+       * El ganador del batch, UNA sola vez.
+       *
+       * Si dos batches seguidos traen anuncios a menos de `ANNOUNCEMENT_MS`,
+       * el segundo pisa al primero: lo ultimo que paso es lo relevante, igual
+       * que con el halo del color activo.
+       */
+      if (best) {
+        setAnnouncement(best);
+        timers.push(setTimeout(() => setAnnouncement(null), ANNOUNCEMENT_MS));
+      }
     });
 
     return () => {
@@ -171,7 +214,7 @@ export function useGameMoments(): {
     };
   }, []);
 
-  return { flights, penalty, roundScore, reverseFlash };
+  return { flights, penalty, roundScore, announcement };
 }
 
 export const DRAW_FLIGHT_MS = FLIGHT_MS;

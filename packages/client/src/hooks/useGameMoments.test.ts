@@ -219,17 +219,17 @@ describe('useGameMoments', () => {
       const { result } = renderHook(() => useGameMoments());
 
       emit('me', [{ type: 'DIRECTION_REVERSED', direction: -1 }]);
-      expect(result.current.reverseFlash).toBe(true);
+      expect(result.current.announcement?.kind).toBe('reverse');
 
       act(() => {
         vi.advanceTimersByTime(1500);
       });
-      expect(result.current.reverseFlash).toBe(false);
+      expect(result.current.announcement).toBeNull();
 
       // Tres cartas mas SIN reverse: el destello no puede volver.
       for (const _ of [1, 2, 3]) {
         emit('me', [{ type: 'CARD_PLAYED', playerId: 'rival', card: card('x') }]);
-        expect(result.current.reverseFlash, 'volvio a destellar sin reverse').toBe(false);
+        expect(result.current.announcement, 'volvio a destellar sin reverse').toBeNull();
       }
     });
 
@@ -241,10 +241,74 @@ describe('useGameMoments', () => {
       act(() => {
         vi.advanceTimersByTime(1500);
       });
-      expect(result.current.reverseFlash).toBe(false);
+      expect(result.current.announcement).toBeNull();
 
       emit('me', [{ type: 'DIRECTION_REVERSED', direction: 1 }]);
-      expect(result.current.reverseFlash).toBe(true);
+      expect(result.current.announcement?.kind).toBe('reverse');
+    });
+  });
+
+  describe('prioridad de anuncios', () => {
+    /**
+     * EL RIESGO de esta fase, y no es hipotetico: el engine emite
+     * `CARDS_DRAWN` y `PLAYER_SKIPPED` en el MISMO batch para cada +2 y +4
+     * (`game.ts:556-561`).
+     *
+     * Con un booleano por evento, un +4 recibido mostraria dos carteles
+     * centrados uno encima del otro — mas el flash rojo de castigo, que se
+     * dispara por el mismo evento. Tres animaciones a la vez.
+     */
+    it('EL RIESGO: un +4 con salteo anuncia UNA sola cosa', () => {
+      const { result } = renderHook(() => useGameMoments());
+      const cards = ['a', 'b', 'c', 'd'].map(card);
+
+      emit('me', [
+        { type: 'CARDS_DRAWN', playerId: 'me', count: 4, cards },
+        { type: 'PLAYER_SKIPPED', playerId: 'me' },
+      ]);
+
+      expect(result.current.announcement?.kind).toBe('draw4');
+    });
+
+    it('un +2 con salteo anuncia el +2', () => {
+      const { result } = renderHook(() => useGameMoments());
+      emit('me', [
+        { type: 'CARDS_DRAWN', playerId: 'me', count: 2, cards: [card('a'), card('b')] },
+        { type: 'PLAYER_SKIPPED', playerId: 'me' },
+      ]);
+      expect(result.current.announcement?.kind).toBe('draw2');
+    });
+
+    /** Reverse con 2 jugadores: el engine emite los dos (`game.ts:533-534`). */
+    it('un reverse con salteo anuncia el reverse', () => {
+      const { result } = renderHook(() => useGameMoments());
+      emit('me', [
+        { type: 'DIRECTION_REVERSED', direction: -1 },
+        { type: 'PLAYER_SKIPPED', playerId: 'me' },
+      ]);
+      expect(result.current.announcement?.kind).toBe('reverse');
+    });
+
+    it('un salteo solo SI se anuncia', () => {
+      const { result } = renderHook(() => useGameMoments());
+      emit('me', [{ type: 'PLAYER_SKIPPED', playerId: 'me' }]);
+      expect(result.current.announcement?.kind).toBe('skipped');
+    });
+
+    it('el salteo AJENO no se anuncia: seria ruido con 10 jugadores', () => {
+      const { result } = renderHook(() => useGameMoments());
+      emit('me', [{ type: 'PLAYER_SKIPPED', playerId: 'rival' }]);
+      expect(result.current.announcement).toBeNull();
+    });
+
+    /**
+     * La excepcion: el ÚLTIMA ajeno SI se ve. Es informacion de mesa — si no
+     * ves que canto, no sabes que ya no lo podes acusar.
+     */
+    it('el ÚLTIMA ajeno SI se anuncia, con el nombre', () => {
+      const { result } = renderHook(() => useGameMoments());
+      emit('me', [{ type: 'UNO_DECLARED', playerId: 'rival' }]);
+      expect(result.current.announcement?.kind).toBe('uno');
     });
   });
 

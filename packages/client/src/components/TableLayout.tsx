@@ -5,7 +5,7 @@ import { HandActions } from './HandActions.js';
 import { DiscardPile } from './DiscardPile.js';
 import { Hand } from './Hand.js';
 import { PlayerSeat } from './PlayerSeat.js';
-import { ReverseFlash } from './ReverseFlash.js';
+import { AnnouncementLayer, type Announcement } from './Announcement.js';
 import { seatPositions, seatVariant } from './seats.js';
 
 export interface TableLayoutProps {
@@ -27,7 +27,7 @@ export interface TableLayoutProps {
   unoWindowFor?: string | null;
   /** Ya cantaste ÚLTIMA y todavia no jugaste. */
   unoArmed?: boolean;
-  reverseFlash?: boolean;
+  announcement?: Announcement | null;
   onPlay?: (card: CardModel) => void;
   onDraw?: () => void;
   onCallOut?: (playerId: string) => void;
@@ -53,7 +53,7 @@ export function TableLayout({
   isMyTurn = false,
   unoWindowFor = null,
   unoArmed = false,
-  reverseFlash = false,
+  announcement = null,
   onPlay,
   onDraw,
   onCallOut,
@@ -105,7 +105,7 @@ export function TableLayout({
 
           <div className="absolute left-1/2 top-[45%] -translate-x-1/2 -translate-y-1/2">
             <div className="flex flex-col items-center gap-2">
-              <DirectionIndicator direction={direction} flash={reverseFlash} />
+              <DirectionIndicator direction={direction} flash={announcement?.kind === 'reverse'} />
               <DiscardPile
                 top={discardTop}
                 activeColor={activeColor}
@@ -167,7 +167,7 @@ export function TableLayout({
           />
         </div>
 
-        <ReverseFlash show={reverseFlash} direction={direction} />
+        <AnnouncementLayer announcement={announcement} />
 
         <span className="sr-only">Sos {myId}</span>
       </div>
