@@ -7,6 +7,23 @@ export interface HandActionsProps {
   /** Ya cantaste y todavia no jugaste. */
   armed?: boolean;
   onDeclareUno?: () => void;
+  /**
+   * Es tu turno y NINGUNA carta sirve: solo queda robar.
+   *
+   * Se puede clickear el mazo, pero el mazo esta en el centro de la mesa y tu
+   * atencion esta en tu mano. Al aparecer solo en este caso, el boton ademas
+   * INFORMA: si esta, es porque no tenes nada.
+   */
+  mustDraw?: boolean;
+  onDraw?: () => void;
+  /**
+   * Robaste una carta que SI se puede jugar, y podes quedartela.
+   *
+   * Solo en fase `card_drawn`: fuera de ella el motor rechaza el comando, asi
+   * que mostrarlo siempre seria mentir sobre lo que se puede hacer.
+   */
+  canPass?: boolean;
+  onPass?: () => void;
   /** A quien se le puede acusar el ÚLTIMA no cantado, si la ventana esta abierta. */
   callOut?: { playerId: string; nickname: string } | null;
   onCallOut?: (playerId: string) => void;
@@ -31,6 +48,10 @@ export function HandActions({
   aboutToWin = false,
   armed = false,
   onDeclareUno,
+  mustDraw = false,
+  onDraw,
+  canPass = false,
+  onPass,
   callOut = null,
   onCallOut,
 }: HandActionsProps): JSX.Element {
@@ -58,6 +79,57 @@ export function HandActions({
             {/* El nombre primero: con 10 jugadores hay que saber a quien. */}
             <span className="max-w-[9rem] truncate">{callOut.nickname}</span>
             <span className="font-normal opacity-90">no dijo ÚLTIMA</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/*
+        Robar y Paso son EXCLUYENTES: robar pasa a fase `card_drawn`, que es
+        justo donde aparece Paso. Nunca se ven los dos juntos, asi que uno
+        reemplaza al otro en el mismo lugar y el ojo no tiene que re-buscar.
+
+        Los dos entran animados por la misma razon que Acusar: aparecen y
+        desaparecen con el estado del turno, y algo que se materializa al lado
+        de tu mano se nota sin ir a buscarlo.
+      */}
+      <AnimatePresence mode="wait">
+        {/*
+          `canPass` gana: si estas en `card_drawn` ya robaste, y ofrecer
+          "Robar" de nuevo seria ofrecer algo que el motor rechaza.
+
+          La exclusion se decide ACA y no solo en quien llama: `mode="wait"`
+          ordena las transiciones pero NO hace excluyentes a dos condiciones
+          verdaderas, y un componente no deberia depender de que lo usen bien.
+        */}
+        {mustDraw && !canPass && onDraw && (
+          <motion.button
+            key="draw"
+            type="button"
+            onClick={onDraw}
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={SPRING.pop}
+            className="rounded-full bg-raised-hover px-5 py-1.5 font-display text-body font-bold
+                       text-white shadow-card-lift hover:brightness-125"
+          >
+            Robar
+          </motion.button>
+        )}
+
+        {canPass && onPass && (
+          <motion.button
+            key="pass"
+            type="button"
+            onClick={onPass}
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={SPRING.pop}
+            className="rounded-full bg-raised-hover px-5 py-1.5 font-display text-body font-bold
+                       text-white shadow-card-lift hover:brightness-125"
+          >
+            Paso
           </motion.button>
         )}
       </AnimatePresence>

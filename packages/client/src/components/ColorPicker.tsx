@@ -7,6 +7,18 @@ export interface ColorPickerProps {
   open: boolean;
   onPick: (color: Color) => void;
   onCancel?: () => void;
+  /**
+   * Esta jugada te deja en una carta: hay que poder cantar ÚLTIMA desde acá.
+   *
+   * Sin esto, jugar un comodin como penultima carta era una trampa: tocar la
+   * carta abre este modal —`inset-0` y con el foco atrapado— asi que el boton
+   * ¡ÚLTIMA! de la barra de mano queda INALCANZABLE. Si no habias cantado
+   * antes de elegir la carta, perdias la chance y te acusaban.
+   */
+  aboutToWin?: boolean;
+  /** Ya cantaste: la jugada va a viajar con `declareUno`. */
+  unoArmed?: boolean;
+  onDeclareUno?: () => void;
 }
 
 const SWATCH: Record<Color, string> = {
@@ -23,7 +35,14 @@ const LABEL: Record<Color, string> = {
   blue: 'Azul',
 };
 
-export function ColorPicker({ open, onPick, onCancel }: ColorPickerProps): JSX.Element {
+export function ColorPicker({
+  open,
+  onPick,
+  onCancel,
+  aboutToWin = false,
+  unoArmed = false,
+  onDeclareUno,
+}: ColorPickerProps): JSX.Element {
   /**
    * Acá SÍ va `onEscape`: cancelar es válido — elegiste un wild y te
    * arrepentiste. El de fin de ronda no lo pasa, porque ahí cerrar dejaría al
@@ -68,11 +87,36 @@ export function ColorPicker({ open, onPick, onCancel }: ColorPickerProps): JSX.E
                 />
               ))}
             </div>
+            {/*
+              El canto va ACA, sobre el cancelar, porque esta jugada te deja
+              en una carta y este modal es lo unico que ves.
+
+              Es un INTERRUPTOR, no una accion: lo que hace es decidir si el
+              comando que estas por mandar lleva `declareUno`. Por eso queda
+              marcado y no desaparece al tocarlo — tenes que poder ver que
+              cantaste antes de elegir el color.
+            */}
+            {aboutToWin && onDeclareUno && (
+              <button
+                type="button"
+                onClick={onDeclareUno}
+                aria-pressed={unoArmed}
+                className={`mt-4 w-full rounded-lg py-2 font-display text-body font-black
+                            transition-colors ${
+                              unoArmed
+                                ? 'bg-intent-ok text-brand-ink'
+                                : 'bg-brand-accent text-brand-ink hover:brightness-110'
+                            }`}
+              >
+                {unoArmed ? '¡ÚLTIMA! ✓' : '¡ÚLTIMA!'}
+              </button>
+            )}
+
             {onCancel && (
               <button
                 type="button"
                 onClick={onCancel}
-                className="mt-4 w-full rounded-lg py-2 text-body text-white/60 hover:text-white"
+                className="mt-2 w-full rounded-lg py-2 text-body text-white/60 hover:text-white"
               >
                 Cancelar
               </button>

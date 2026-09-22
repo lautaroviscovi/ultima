@@ -10,6 +10,7 @@ import {
   leaveRoom,
   nextRound,
   playCard,
+  pass,
   playDrawnCard,
   resumeSession,
 } from '../net/commands.js';
@@ -167,6 +168,18 @@ export function Table(): JSX.Element {
   }, []);
 
   /**
+   * Quedarse la carta robada en vez de jugarla.
+   *
+   * `pass()` existia en `commands.ts` desde siempre y NINGUN componente lo
+   * llamaba: solo se alcanzaba desde el CLI y el simulador. O sea que si
+   * robabas una carta jugable, la unica salida era jugarla o dejar que se
+   * venciera el turno.
+   */
+  const handlePass = useCallback(() => {
+    void pass();
+  }, []);
+
+  /**
    * Cantar ÚLTIMA.
    *
    * Hace las dos cosas: manda el comando suelto (por si cantas y tardas en
@@ -287,6 +300,8 @@ export function Table(): JSX.Element {
           turnProgress={timer.progress}
           secondsLeft={timer.secondsLeft}
           isMyTurn={isMyTurn}
+          canPass={state.phase === 'card_drawn' && isMyTurn}
+          onPass={handlePass}
           unoWindowFor={unoWindowFor}
           unoArmed={unoArmed}
           announcement={announcement}
@@ -306,6 +321,9 @@ export function Table(): JSX.Element {
         */}
         <ColorPicker
           open={colorPickerOpen || (state.phase === 'choosing_color' && isMyTurn)}
+          aboutToWin={hand.length === 2}
+          unoArmed={unoArmed}
+          onDeclareUno={handleDeclareUno}
           onPick={handleColorPick}
           {...(colorPickerOpen ? { onCancel: closeColorPicker } : {})}
         />

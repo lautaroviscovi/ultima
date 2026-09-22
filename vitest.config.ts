@@ -10,11 +10,15 @@ export default defineConfig({
      * `pnpm test` pasaba verde igual — el peor modo de falla posible: creer
      * que hay cobertura cuando no corrio nada.
      *
-     * Hoy no hay ningun test de render en el repo, pero `jsdom` y
-     * `@testing-library/react` ya estan instalados, asi que la trampa estaba
-     * armada para el primero que lo intentara.
+     * `jsdom` y `@testing-library/react` ya estaban instalados, asi que la
+     * trampa estaba armada para el primero que lo intentara.
      */
     include: ['packages/*/src/**/*.test.{ts,tsx}'],
+    /**
+     * `cleanup()` entre tests. Testing Library lo hace solo con
+     * `globals: true`, que este repo no usa — ver `vitest.setup.ts`.
+     */
+    setupFiles: ['./packages/client/vitest.setup.ts'],
     // Los tests del worker corren DENTRO de workerd con su propio config:
     // `pnpm --filter @uno/worker test`. Probar un Durable Object con el
     // runtime de Node no probaria nada de lo que importa.

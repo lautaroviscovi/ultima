@@ -39,12 +39,20 @@ function propsFor(playerCount: number, overrides: Parameters<typeof makeRedacted
     turnProgress: 0.7,
     isMyTurn: state.currentPlayerId === state.you.id,
     /**
-     * `onPlay` no es decorativo en las stories: `Card` solo trata una carta
-     * como accionable si recibe un handler, y de eso depende que se vean los
-     * estados de jugable/invalida. Sin esto, las stories muestran una mano
-     * inerte que no se parece a la del juego.
+     * Los handlers NO son decorativos en las stories.
+     *
+     * `Card` solo trata una carta como accionable si recibe un handler, y de
+     * eso depende que se vean los estados de jugable/invalida. Sin esto, las
+     * stories muestran una mano inerte que no se parece a la del juego.
+     *
+     * Lo mismo vale para `onDraw` y `onPass`: `HandActions` no dibuja un
+     * boton que no tendria a donde llamar. Sin ellos, las stories de "Robar"
+     * y "Paso" se veian SIN el boton que vienen a mostrar — que es
+     * exactamente la trampa que ya habia pasado con `onPlay`.
      */
     onPlay: () => {},
+    onDraw: () => {},
+    onPass: () => {},
   };
 }
 
@@ -187,4 +195,33 @@ export const MovimientoReducido: Story = {
     announcement: { kind: 'reverse' as const, direction: 1 as const },
   },
   globals: { motion: 'reduced' },
+};
+
+/**
+ * Tu turno y NINGUNA carta sirve: aparece "Robar" al lado de ¡ÚLTIMA!.
+ *
+ * Se puede clickear el mazo, pero el mazo esta en el centro de la mesa y tu
+ * atencion esta abajo, en tu mano. Y como el boton solo aparece en este caso,
+ * su presencia ya informa: si esta, es porque no tenes nada.
+ */
+export const SinCartasJugables: Story = {
+  args: {
+    ...propsFor(10, { currentSeat: 0 }),
+    isMyTurn: true,
+    playable: new Set<string>(),
+  },
+};
+
+/**
+ * Robaste una carta que SI se puede jugar: aparece "Paso" por si preferis
+ * guardartela.
+ *
+ * Nunca se ve junto a "Robar": robar es lo que te trajo hasta aca.
+ */
+export const RobasteYPodesPasar: Story = {
+  args: {
+    ...propsFor(10, { currentSeat: 0 }),
+    isMyTurn: true,
+    canPass: true,
+  },
 };

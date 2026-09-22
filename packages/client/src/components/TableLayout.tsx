@@ -28,6 +28,14 @@ export interface TableLayoutProps {
   unoWindowFor?: string | null;
   /** Ya cantaste ÚLTIMA y todavia no jugaste. */
   unoArmed?: boolean;
+  /**
+   * Robaste y la carta SE PUEDE jugar: podes quedartela y pasar.
+   *
+   * Viene calculado de afuera —es la fase `card_drawn` del motor— en vez de
+   * deducirse acá: el layout dibuja, no interpreta reglas.
+   */
+  canPass?: boolean;
+  onPass?: () => void;
   announcement?: Announcement | null;
   onPlay?: (card: CardModel) => void;
   onDraw?: () => void;
@@ -68,6 +76,8 @@ export function TableLayout({
   isMyTurn = false,
   unoWindowFor = null,
   unoArmed = false,
+  canPass = false,
+  onPass,
   announcement = null,
   onPlay,
   onDraw,
@@ -77,6 +87,15 @@ export function TableLayout({
   const positions = seatPositions(opponents.length);
   const variant = seatVariant(opponents.length);
   const aboutToWin = hand.length === 2;
+
+  /**
+   * Es tu turno y NINGUNA carta sirve.
+   *
+   * `canPass` lo excluye a proposito: en fase `card_drawn` ya robaste, y ahi
+   * la accion es jugar la robada o pasar — ofrecer "Robar" de nuevo seria
+   * ofrecer algo que el motor rechaza.
+   */
+  const mustDraw = isMyTurn && !canPass && (playable?.size ?? 0) === 0;
 
   /**
    * A quien se le puede acusar, con su nombre.
@@ -241,6 +260,10 @@ export function TableLayout({
             <HandActions
               aboutToWin={aboutToWin}
               armed={unoArmed}
+              mustDraw={mustDraw}
+              canPass={canPass}
+              {...(onDraw ? { onDraw } : {})}
+              {...(onPass ? { onPass } : {})}
               {...(onDeclareUno ? { onDeclareUno } : {})}
               {...(callOut ? { callOut } : {})}
               {...(onCallOut ? { onCallOut } : {})}
