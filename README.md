@@ -9,6 +9,9 @@ producto **es** el grito, que es la misma relación que tiene "UNO" con el juego
 original — y ese nombre es marca registrada de Mattel, así que con el juego
 público no se usa.
 
+**Jugar: https://uno-delta-two.vercel.app** — hace falta una ventana de al
+menos 1100×600px; la mesa de 10 no entra en un teléfono.
+
 ## Principios
 
 1. **Una sola fuente de verdad: el proceso del servidor.** El cliente es una
@@ -369,3 +372,10 @@ un Durable Object con el runtime de Node no probaria nada de lo que importa.
 Invariantes chequeadas en cada paso: siempre 108 cartas, ningún `CardId`
 duplicado, el jugador de turno siempre existe y nunca está abandonado, y ninguna
 partida se cuelga.
+
+## Licencia
+
+MIT — ver [LICENSE](LICENSE).
+
+Proyecto personal, sin relación con Mattel. Las reglas de los juegos de cartas
+no son registrables; la marca "UNO" sí, y por eso no se usa.
