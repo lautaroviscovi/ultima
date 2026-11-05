@@ -94,6 +94,19 @@ function render(state: RedactedGameState, myId: string): void {
   if (state.currentPlayerId === myId) console.log('  \x1b[92mTE TOCA\x1b[0m');
 }
 
+/**
+ * Cada cuanto un bot se OLVIDA de cantar ÚLTIMA.
+ *
+ * Mismo numero que el simulador, y por la misma razon: hasta ahora los bots
+ * mandaban `declareUno: true` fijo, y el engine solo abre la ventana de
+ * acusacion si NO cantaste. O sea que jugando contra bots la mecanica de
+ * acusar era inalcanzable — no habia a quien acusar.
+ *
+ * No es realismo: ningun jugador se olvida un tercio de las veces. Es para que
+ * en una partida corta ya tengas varias chances de probar el circuito.
+ */
+const FORGET_UNO_IN = 3;
+
 /** Bot que juega legal. Sirve para llenar la mesa y probar con 10. */
 async function runBot(roomId: string, index: number): Promise<void> {
   const socket: ClientSocket = connect(url, { transports: ['websocket'] });
@@ -114,6 +127,26 @@ async function runBot(roomId: string, index: number): Promise<void> {
   let seq = 0;
 
   socket.on('state:patch', ({ state }) => {
+    /**
+     * Acusar va ANTES del guard de turno, y no es un detalle: acusar pasa
+     * FUERA de tu turno. Con el `return` de abajo primero, un bot no podria
+     * acusar nunca — que es la razon por la que, jugando contra bots, nadie
+     * te penalizaba aunque te olvidaras de cantar.
+     *
+     * La ventana dura segundos, asi que el bot responde sin el delay de 400ms
+     * que usa para jugar.
+     */
+    const window = state.unoWindow;
+    if (window && window.playerId !== myId) {
+      const target = state.players.find((p) => p.id === window.playerId);
+      if (target && target.cardCount === 1 && !target.hasDeclaredUno) {
+        void emit(socket, 'game:command', {
+          command: { type: 'CALL_OUT_UNO', targetId: window.playerId },
+          clientSeq: ++seq,
+        });
+      }
+    }
+
     if (state.currentPlayerId !== myId) return;
     setTimeout(() => {
       let command: PlayerCommand;
@@ -128,8 +161,10 @@ async function runBot(roomId: string, index: number): Promise<void> {
           state.discardTop,
           state.pendingDraw,
         )[0];
+        // El bot olvidadizo: sin esto nunca hay a quien acusar.
+        const declareUno = Math.floor(Math.random() * FORGET_UNO_IN) !== 0;
         command = card
-          ? { type: 'PLAY_CARD', cardId: card.id, chosenColor: 'red', declareUno: true }
+          ? { type: 'PLAY_CARD', cardId: card.id, chosenColor: 'red', declareUno }
           : { type: 'DRAW_CARD' };
       }
       void emit(socket, 'game:command', { command, clientSeq: ++seq });
