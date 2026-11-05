@@ -373,6 +373,14 @@ Invariantes chequeadas en cada paso: siempre 108 cartas, ningún `CardId`
 duplicado, el jugador de turno siempre existe y nunca está abandonado, y ninguna
 partida se cuelga.
 
+Los bots **se olvidan de cantar ÚLTIMA** 1 de cada 3 veces, y acusan cuando
+pueden. No es realismo: es cobertura. Mientras todos cantaban siempre, el motor
+nunca abría la ventana de acusación (`openUnoWindowIfNeeded` sólo la abre si
+NO cantaste), así que esa mecánica —con sus partes delicadas: idempotencia ante
+acusaciones simultáneas y una ventana que debe cerrarse sola— pasaba 1000
+partidas en verde sin ejecutarse una sola vez. El gate ahora **reporta** cuántas
+acusaciones penalizaron: si vuelve a dar 0, es que dejó de ejercitarse.
+
 ## Licencia
 
 MIT — ver [LICENSE](LICENSE).

@@ -29,6 +29,32 @@ if (!Number.isInteger(PLAYERS) || PLAYERS < 2 || PLAYERS > 10) {
 }
 const MAX_TURNS = 5000;
 
+/**
+ * Cada cuanto un bot se OLVIDA de cantar ÚLTIMA.
+ *
+ * Existe porque hasta ahora todos los bots mandaban `declareUno: true` fijo, y
+ * el engine solo abre la ventana de acusacion si NO cantaste
+ * (`openUnoWindowIfNeeded`). O sea que el simulador jugaba 1000 partidas sin
+ * ejercitar NUNCA la mecanica de acusar — que es justo la que tiene las partes
+ * delicadas: idempotencia ante acusaciones simultaneas, y una ventana que
+ * tiene que cerrarse sola.
+ *
+ * 1 de cada 3 y no 1 de cada 20: esto es un gate, no una simulacion realista.
+ * Lo que se busca es que el camino se recorra seguido en poco tiempo.
+ */
+const FORGET_UNO_IN = 3;
+
+/**
+ * Cada cuanto un bot que PUEDE acusar lo hace.
+ *
+ * Olvidarse no alcanza por si solo: sin nadie que acuse, la ventana se abre y
+ * se cierra sin que `CALL_OUT_UNO` corra jamas. Hacen falta las dos mitades.
+ *
+ * No es 1 de cada 1 a proposito: que a veces nadie acuse ejercita el OTRO
+ * camino, el de la ventana que expira sola.
+ */
+const CALL_OUT_IN = 2;
+
 interface Failure {
   seed: string;
   reason: string;
@@ -59,9 +85,64 @@ function checkInvariants(s: GameState, turn: number): string | null {
   return null;
 }
 
+/**
+ * Alguien con la ventana abierta en contra, si hay quien lo acuse.
+ *
+ * Devuelve el acusador y el acusado, o null. El acusador NO puede ser el
+ * acusado: acusarse a uno mismo no es la mecanica.
+ */
+function findCallOut(state: GameState): { by: string; target: string } | null {
+  const window = state.unoWindow;
+  if (!window) return null;
+
+  const target = state.players.find((p) => p.id === window.playerId);
+  if (!target || target.hand.length !== 1 || target.hasDeclaredUno) return null;
+
+  const accuser = state.players.find((p) => p.id !== target.id && !p.abandoned);
+  return accuser ? { by: accuser.id, target: target.id } : null;
+}
+
+/**
+ * Acusaciones que terminaron en penalidad, en toda la corrida.
+ *
+ * El gate lo REPORTA: si alguna vez vuelve a dar 0, significa que la mecanica
+ * de acusar dejo de ejercitarse — que es exactamente el estado en el que
+ * estuvo el simulador hasta ahora, en silencio y con 1000 partidas en verde.
+ */
+let penaltiesApplied = 0;
+
 function step(state: GameState, rng: Rng, turn: number): GameState {
   const player = state.players[state.currentPlayerIndex]!;
   const ctx = { playerId: player.id, now: turn * 1000 };
+
+  /**
+   * Acusar va ANTES de jugar el turno, porque la ventana es efimera: el engine
+   * la cierra al avanzar el turno, asi que si el bot juega primero ya no queda
+   * nada que acusar.
+   *
+   * `CALL_OUT_UNO` no consume el turno —lo manda otro jugador, no el de
+   * turno— asi que esto devuelve el estado y el turno sigue su curso en el
+   * proximo `step`.
+   */
+  const callOut = findCallOut(state);
+  if (callOut && rng.nextInt(CALL_OUT_IN) === 0) {
+    const result = reduce(
+      state,
+      { type: 'CALL_OUT_UNO', targetId: callOut.target },
+      { playerId: callOut.by, now: turn * 1000 },
+    );
+    penaltiesApplied += result.events.filter((e) => e.type === 'UNO_PENALTY').length;
+    return result.state;
+  }
+
+  /**
+   * El bot olvidadizo.
+   *
+   * Se decide por turno y del MISMO stream de rng que todo lo demas, asi que
+   * una seed sigue reproduciendo exactamente la misma partida — que es lo que
+   * hace util un fallo del gate.
+   */
+  const declareUno = rng.nextInt(FORGET_UNO_IN) !== 0;
 
   if (state.phase === 'choosing_color') {
     return reduce(state, { type: 'CHOOSE_COLOR', color: rng.pick(COLORS) }, ctx).state;
@@ -76,7 +157,7 @@ function step(state: GameState, rng: Rng, turn: number): GameState {
     ) {
       return reduce(
         state,
-        { type: 'PLAY_DRAWN_CARD', chosenColor: rng.pick(COLORS), declareUno: true },
+        { type: 'PLAY_DRAWN_CARD', chosenColor: rng.pick(COLORS), declareUno },
         ctx,
       ).state;
     }
@@ -89,7 +170,7 @@ function step(state: GameState, rng: Rng, turn: number): GameState {
     const card = rng.pick(playable);
     return reduce(
       state,
-      { type: 'PLAY_CARD', cardId: card.id, chosenColor: rng.pick(COLORS), declareUno: true },
+      { type: 'PLAY_CARD', cardId: card.id, chosenColor: rng.pick(COLORS), declareUno },
       ctx,
     ).state;
   }
@@ -169,6 +250,11 @@ console.log(
   `Turnos  promedio/p50/p95/max : ${avg(turnCounts).toFixed(0)} / ${percentile(sortedTurns, 50)} / ${percentile(sortedTurns, 95)} / ${sortedTurns.at(-1) ?? 0}`,
 );
 console.log(`Rondas  promedio             : ${avg(roundCounts).toFixed(1)}`);
+/**
+ * Si esto da 0, la mecanica de acusar NO se ejercito — y el gate estaria
+ * pasando en verde sin tocarla, que es como estuvo hasta ahora.
+ */
+console.log(`Acusaciones de ÚLTIMA penalizadas : ${penaltiesApplied}`);
 
 if (failures.length > 0) {
   console.log('\nFallos (reproducibles desde su seed):');
